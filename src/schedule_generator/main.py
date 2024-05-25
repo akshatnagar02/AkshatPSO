@@ -316,7 +316,7 @@ class JobShopProblem:
     def make_schedule(
         self, job_order: list[int], machine_assignment: list[int]
     ) -> schedule_type:
-        """Create a schedule based on a give job order and machine assignment.
+        """Create a schedule based on a given job order and machine assignment.
 
         Note that the job_order is relative, and machine_assignment is absolute. That means that
         the machine_assignment have at index i the machine assignment for job i. While the job_order
