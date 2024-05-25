@@ -85,7 +85,9 @@ class JobShopProblem:
                 job_id, start_time, end_time = task
                 if job_id == -1:
                     continue
-                setup_time = self.setup_times[sch[idx - 1][0], job_id]
+                setup_time = 0
+                if idx > 1:
+                    setup_time = self.setup_times[sch[idx - 1][0], job_id]
                 # Check if we have a preemption job
                 plot_times = [(start_time, end_time, setup_time)]
                 if (
