@@ -377,10 +377,7 @@ class JobShopProblem:
                 setup_time: int = self.setup_times[
                     schedule[machine_idx][-1][0], task_idx
                 ]
-            task_duration: int = int(
-                task.available_machines[machine_idx]
-                + setup_time
-            )
+            task_duration: int = int(task.available_machines[machine_idx] + setup_time)
             # If task is schedule before the machine starts, we move it to the start time
             if start_time % DAY_MINUTES < machine.start_time:
                 start_time = (
@@ -452,8 +449,7 @@ class JobShopProblem:
                         schedule[machine_idx][-1][0], task_idx
                     ]
                 task_duration: int = int(
-                    task.available_machines[machine_idx]
-                    + setup_time
+                    task.available_machines[machine_idx] + setup_time
                 )
                 # If task is schedule before the machine starts, we move it to the start time
                 if start_time % DAY_MINUTES < machine.start_time:
@@ -545,7 +541,8 @@ class JobShopProblem:
                 elif machine.name[0] == "B":
                     # Check if we have enough stock to produce the product
                     amount_needed = (
-                        task.amount * self.bottle_size_mapping[task.station_settings["bottle_size"]]
+                        task.amount
+                        * self.bottle_size_mapping[task.station_settings["bottle_size"]]
                     )
                     stock_available = stock[task.station_settings["taste"]]
                     if stock_available >= amount_needed:
@@ -577,7 +574,7 @@ class JobShopProblem:
             chosen_job = min(jobs_to_choose_from, key=lambda x: x[2])
             machine: Machine = self.machines[chosen_job[0]]
             task: Job = self.jobs[chosen_job[1]]
-            
+
             # Only add setup time if we have a previous task
             setup_time: int = 0
             if len(schedule[machine.machine_id]) > 1:
@@ -588,10 +585,7 @@ class JobShopProblem:
             # Case for mixing line
             if machine.name[0] == "M":
                 start_time = chosen_job[2]
-                task_duration = (
-                    task.available_machines[machine.machine_id]
-                    + setup_time
-                )
+                task_duration = task.available_machines[machine.machine_id] + setup_time
                 end_time = chosen_job[2] + task_duration
                 start_time, end_time = self._calculate_start_and_end_time(
                     machine.allow_preemption,
@@ -604,13 +598,18 @@ class JobShopProblem:
                     (chosen_job[1], start_time, end_time)
                 )
                 awaiting_release.append(
-                    (end_time, task.station_settings["taste"], machine.max_units_per_run)
+                    (
+                        end_time,
+                        task.station_settings["taste"],
+                        machine.max_units_per_run,
+                    )
                 )
 
             # Case for bottling line
             elif machine.name[0] == "B":
                 amount_needed = (
-                    task.amount * self.bottle_size_mapping[task.station_settings["bottle_size"]]
+                    task.amount
+                    * self.bottle_size_mapping[task.station_settings["bottle_size"]]
                 )
                 to_be_removed = list()
                 for release_time, hf_product, amount in awaiting_release:
@@ -628,10 +627,7 @@ class JobShopProblem:
                         f"Stock is not enough to produce {task.production_order_nr}, this shouldn't happen..."
                     )
                 start_time = chosen_job[2]
-                task_duration = (
-                    task.available_machines[machine.machine_id]
-                    + setup_time
-                    )
+                task_duration = task.available_machines[machine.machine_id] + setup_time
                 end_time = chosen_job[2] + task_duration
                 start_time, end_time = self._calculate_start_and_end_time(
                     machine.allow_preemption,

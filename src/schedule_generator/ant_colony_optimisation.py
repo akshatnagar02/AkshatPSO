@@ -314,7 +314,9 @@ class TwoStageACO:
 
 
 if __name__ == "__main__":
-    data = parse_data(r"B:\Documents\Skola\UvA\Y3P6\git_folder\src\examples\data_v1.xlsx")
+    data = parse_data(
+        r"B:\Documents\Skola\UvA\Y3P6\git_folder\src\examples\data_v1.xlsx"
+    )
     jssp = JobShopProblem.from_data(data)
     aco = TwoStageACO(
         jssp,
@@ -336,9 +338,7 @@ if __name__ == "__main__":
     print(f"Time taken: {time.time() - start_time}")
     print(aco.best_solution)
     sc = aco.problem.make_schedule_from_parallel_with_stock(aco.best_solution[1])
-    aco.problem.visualize_schedule(
-        sc
-    )
+    aco.problem.visualize_schedule(sc)
     plt.imshow(aco.pheromones_stage_one)
     plt.colorbar()
     plt.show()
