@@ -369,9 +369,15 @@ class JobShopProblem:
             # Get the start time of the task
             start_time = max([task[2] for task in relevant_task])
 
+            # Only add setup time if we have a previous task
+            setup_time: int = 0
+            if len(schedule[machine_idx]) > 1:
+                setup_time: int = self.setup_times[
+                    schedule[machine_idx][-1][0], task_idx
+                ]
             task_duration: int = int(
                 task.available_machines[machine_idx]
-                + self.setup_times[latest_job_on_same_machine[0], task_idx]
+                + setup_time
             )
             # If task is schedule before the machine starts, we move it to the start time
             if start_time % DAY_MINUTES < machine.start_time:
@@ -437,9 +443,15 @@ class JobShopProblem:
                 # Get the start time of the task
                 start_time = max([task[2] for task in relevant_task])
 
+                # Only add setup time if we have a previous task
+                setup_time = 0
+                if len(schedule[machine_idx]) > 1:
+                    setup_time: int = self.setup_times[
+                        schedule[machine_idx][-1][0], task_idx
+                    ]
                 task_duration: int = int(
                     task.available_machines[machine_idx]
-                    + self.setup_times[latest_job_on_same_machine[0], task_idx]
+                    + setup_time
                 )
                 # If task is schedule before the machine starts, we move it to the start time
                 if start_time % DAY_MINUTES < machine.start_time:
@@ -472,9 +484,8 @@ class JobShopProblem:
         machine_allow_preemption: bool,
         machine_start_time: int,
         machine_end_time: int,
-        start_time: int,
-        end_time: int,
-        task_duration: int,
+        start_time: float,
+        task_duration: float,
     ) -> tuple[int, int]:
         start_time_remainder = start_time % DAY_MINUTES
         if start_time_remainder < machine_start_time:
@@ -564,13 +575,20 @@ class JobShopProblem:
             chosen_job = min(jobs_to_choose_from, key=lambda x: x[2])
             machine: Machine = self.machines[chosen_job[0]]
             task: Job = self.jobs[chosen_job[1]]
+            
+            # Only add setup time if we have a previous task
+            setup_time: int = 0
+            if len(schedule[machine.machine_id]) > 1:
+                setup_time: int = self.setup_times[
+                    schedule[machine.machine_id][-1][0], chosen_job[1]
+                ]
+
+            # Case for mixing line
             if machine.name[0] == "M":
                 start_time = chosen_job[2]
                 task_duration = (
                     task.available_machines[machine.machine_id]
-                    + self.setup_times[
-                        schedule[machine.machine_id][-1][0], chosen_job[1]
-                    ]
+                    + setup_time
                 )
                 end_time = chosen_job[2] + task_duration
                 start_time, end_time = self._calculate_start_and_end_time(
@@ -578,7 +596,6 @@ class JobShopProblem:
                     machine.start_time,
                     machine.end_time,
                     start_time,
-                    end_time,
                     task_duration,
                 )
                 schedule[machine.machine_id].append(
@@ -588,6 +605,7 @@ class JobShopProblem:
                     (end_time, task.station_settings["taste"], machine.max_units_per_run)
                 )
 
+            # Case for bottling line
             elif machine.name[0] == "B":
                 amount_needed = (
                     task.amount * self.bottle_size_mapping[task.station_settings["bottle_size"]]
@@ -610,17 +628,14 @@ class JobShopProblem:
                 start_time = chosen_job[2]
                 task_duration = (
                     task.available_machines[machine.machine_id]
-                    + self.setup_times[
-                        schedule[machine.machine_id][-1][0], chosen_job[1]
-                    ]
-                )
+                    + setup_time
+                    )
                 end_time = chosen_job[2] + task_duration
                 start_time, end_time = self._calculate_start_and_end_time(
                     machine.allow_preemption,
                     machine.start_time,
                     machine.end_time,
                     start_time,
-                    end_time,
                     task_duration,
                 )
                 schedule[machine.machine_id].append(
@@ -654,7 +669,7 @@ class JobShopProblem:
             int: the tardiness of the schedule
         """
         production_order_lateness = {
-            order.production_order_nr: [] for order in self.data.production_orders
+            order.production_order_nr: list() for order in self.data.production_orders
         }
         for machine in schedule.values():
             for task in machine:
@@ -669,7 +684,7 @@ class JobShopProblem:
         tardiness = 0
         for lateness in production_order_lateness.values():
             if any([l > 0 for l in lateness]):
-                tardiness += np.average(lateness) * len(lateness)
+                tardiness += np.max(lateness) * len(lateness)
         return int(tardiness)
 
     def total_setup_time(self, schedule: schedule_type) -> int:
