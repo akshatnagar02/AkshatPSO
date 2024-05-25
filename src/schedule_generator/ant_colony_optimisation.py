@@ -1,4 +1,6 @@
 import time
+
+from matplotlib import pyplot as plt
 from src.production_orders import parse_data
 from src.schedule_generator.main import JobShopProblem, ObjectiveFunction
 from src.schedule_generator.numba_numpy_functions import select_random_item, nb_set_seed
@@ -49,7 +51,7 @@ class TwoStageACO:
         self.n_iter = n_iter
         np.random.seed(seed)
         nb_set_seed(seed)
-        self.rho = rho
+        self.rho = rho / self.n_ants
         self.alpha = alpha
         self.beta = beta
         self.q_zero = q_zero
@@ -133,16 +135,13 @@ class TwoStageACO:
         return assignment
 
     def global_update_pheromones(self):
-        inverse_best_value = (1.0 / self.best_solution[0]) * self.tau_zero
+        inverse_best_value = (1.0 / self.best_solution[0]) / self.tau_zero
         for m_idx, order in enumerate(self.best_solution[1]):
             for idx, job_idx in enumerate(order):
-                if idx == 0 or job_idx == -1:
+                if job_idx == -2:
+                    break
+                if idx == 0:
                     continue
-                # Update stage one
-                self.pheromones_stage_one[job_idx, m_idx] = (
-                    self.pheromones_stage_one[job_idx, m_idx] * (1 - self.alpha)
-                    + self.alpha * inverse_best_value
-                )
                 # Update stage two
                 last_job_idx = order[idx - 1]
                 self.pheromones_stage_two[last_job_idx, job_idx, m_idx] = (
@@ -150,34 +149,43 @@ class TwoStageACO:
                     * (1 - self.alpha)
                     + self.alpha * inverse_best_value
                 )
-
-    def local_update_pheromones(self, schedule: np.ndarray):
-        for machine in range(len(self.problem.machines)):
-            for idx, job_idx in enumerate(schedule[machine]):
-                if idx == 0 or job_idx == -1:
+                if job_idx == -1:
                     continue
-                if job_idx == -2:
-                    break
                 # Update stage one
-                self.pheromones_stage_one[job_idx, machine] = (
-                    self.pheromones_stage_one[job_idx, machine] * (1 - self.rho)
-                    + self.rho * 0.4  # * self.tau_zero
+                self.pheromones_stage_one[job_idx, m_idx] = (
+                    self.pheromones_stage_one[job_idx, m_idx] * (1 - self.alpha)
+                    + self.alpha * inverse_best_value
                 )
 
+    def local_update_pheromones(self, schedule: np.ndarray, objective_value: float):
+        inverse_objective_value = (1.0 / objective_value) / self.tau_zero
+        for machine in range(len(self.problem.machines)):
+            for idx, job_idx in enumerate(schedule[machine]):
+                if job_idx == -2:
+                    break
+                if idx == 0:
+                    continue
                 # Update stage two
                 last_job_idx = schedule[machine][idx - 1]
                 self.pheromones_stage_two[last_job_idx, job_idx, machine] = (
                     self.pheromones_stage_two[last_job_idx, job_idx, machine]
                     * (1 - self.rho)
-                    + self.rho * 0.4  # * self.tau_zero
+                    + self.rho * inverse_objective_value
+                )
+                if job_idx == -1:
+                    continue
+                # Update stage one
+                self.pheromones_stage_one[job_idx, machine] = (
+                    self.pheromones_stage_one[job_idx, machine] * (1 - self.rho)
+                    + self.rho * inverse_objective_value
                 )
 
     def draw_job_to_schedule(
         self, jobs_to_schedule: set[int], last: int, machine: int
     ) -> int:
         jobs_to_schedule_list = list(jobs_to_schedule)
-        if last == -1:
-            return select_random_item(jobs_to_schedule_list)
+        # if last == -1:
+        #     return select_random_item(jobs_to_schedule_list)
 
         probabilites = np.zeros(len(jobs_to_schedule_list))
         denominator = 0.0
@@ -239,6 +247,7 @@ class TwoStageACO:
                     new_schedule[machine][job2_idx],
                     new_schedule[machine][job1_idx],
                 )
+        return new_schedule
 
     def run_ant(self) -> tuple[np.ndarray, dict[int, set[int]]]:
         machine_assignment = self.assign_machines()
@@ -268,8 +277,9 @@ class TwoStageACO:
         schedule, machine_assignment = self.run_ant()
         objective_value = self.evaluate(schedule)
         if self.with_local_search:
-            self.local_search(schedule, machine_assignment, objective_value)
-        self.local_update_pheromones(schedule)
+            schedule = self.local_search(schedule, machine_assignment, objective_value)
+            objective_value = self.evaluate(schedule)
+        self.local_update_pheromones(schedule, objective_value)
         if objective_value <= self.best_solution[0]:
             if objective_value == 0:
                 raise KeyboardInterrupt
@@ -292,39 +302,46 @@ class TwoStageACO:
                 )
             self.global_update_pheromones()
             self.generation_since_last_update += 1
-            if self.generation_since_last_update == 100:
+            if self.generation_since_last_update == 2500:
                 print("Resetting pheromones...")
                 self.pheromones_stage_one *= 0
                 self.pheromones_stage_one += 1
                 self.pheromones_stage_two *= 0
                 self.pheromones_stage_two += 1
                 self.generation_since_last_update = 0
+            self.pheromones_stage_one *= 0.99
+            self.pheromones_stage_two *= 0.99
 
 
 if __name__ == "__main__":
-    data = parse_data("examples/data_v1.xlsx")
+    data = parse_data(r"B:\Documents\Skola\UvA\Y3P6\git_folder\src\examples\data_v1.xlsx")
     jssp = JobShopProblem.from_data(data)
     aco = TwoStageACO(
         jssp,
-        ObjectiveFunction.CUSTOM_OBJECTIVE,
-        verbose=True,
-        n_iter=1,
-        n_ants=1,
-        tau_zero=1.0 / (0.1),
+        ObjectiveFunction.MAKESPAN,
+        verbose=False,
+        n_iter=400,
+        n_ants=100,
+        tau_zero=1.0 / (3510),
         q_zero=0.85,
-        with_stock_schedule=False,
-        seed=65490,
+        with_stock_schedule=True,
+        seed=5342,
         with_local_search=False,
         local_search_iterations=20,
+        alpha=0.1,
+        rho=0.01,
     )
-    # start_time = time.time()
+    start_time = time.time()
     aco.run()
-    # print(f"Time taken: {time.time() - start_time}")
-    # print(aco.best_solution)
-    # sc = aco.problem.make_schedule_from_parallel(aco.best_solution[1])
-    # aco.problem.visualize_schedule(
-    #     sc
-    # )
+    print(f"Time taken: {time.time() - start_time}")
+    print(aco.best_solution)
+    sc = aco.problem.make_schedule_from_parallel_with_stock(aco.best_solution[1])
+    aco.problem.visualize_schedule(
+        sc
+    )
+    plt.imshow(aco.pheromones_stage_one)
+    plt.colorbar()
+    plt.show()
     # aco.problem.visualize_schedule(
     #     aco.problem.make_schedule_from_parallel(aco.best_solution[1])
     # )
