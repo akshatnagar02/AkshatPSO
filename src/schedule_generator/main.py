@@ -518,6 +518,8 @@ class JobShopProblem:
                     available_jobs[machine_idx] += 1
                     next_job_idx = available_jobs[machine_idx]
                     task_idx = job_orders[machine_idx, next_job_idx]
+                    if task_idx == -2:
+                        continue
 
                 task: Job = self.jobs[task_idx]
                 machine: Machine = self.machines[machine_idx]
@@ -530,8 +532,7 @@ class JobShopProblem:
                 elif machine.name[0] == "B":
                     # Check if we have enough stock to produce the product
                     amount_needed = (
-                        task.amount
-                        * self.bottle_size_mapping[task.station_settings["bottle_size"]]
+                        task.amount * self.bottle_size_mapping[task.station_settings["bottle_size"]]
                     )
                     stock_available = stock[task.station_settings["taste"]]
                     if stock_available >= amount_needed:
@@ -540,7 +541,7 @@ class JobShopProblem:
                     else:
                         # Check if we have any awaiting release
                         if len(awaiting_release) > 0:
-                            # awaiting_release.sort(key=lambda x: x[0])
+                            awaiting_release.sort(key=lambda x: x[0])
                             for release_time, hf_product, amount in awaiting_release:
                                 if hf_product != task.station_settings["taste"]:
                                     continue
@@ -584,13 +585,12 @@ class JobShopProblem:
                     (chosen_job[1], start_time, end_time)
                 )
                 awaiting_release.append(
-                    (end_time, task.station_settings["taste"], task.amount)
+                    (end_time, task.station_settings["taste"], machine.max_units_per_run)
                 )
 
             elif machine.name[0] == "B":
                 amount_needed = (
-                    task.amount
-                    * self.bottle_size_mapping[task.station_settings["bottle_size"]]
+                    task.amount * self.bottle_size_mapping[task.station_settings["bottle_size"]]
                 )
                 to_be_removed = list()
                 for release_time, hf_product, amount in awaiting_release:
