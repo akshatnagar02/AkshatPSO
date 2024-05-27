@@ -685,6 +685,15 @@ class JobShopProblem:
                 tardiness += np.max(lateness) * len(lateness)
         return int(tardiness)
 
+    def classical_tardiness(self, schedule: schedule_type) -> float:
+        return sum(
+            [
+                max(task[2] - self.jobs[task[0]].days_till_delivery * DAY_MINUTES, 0)
+                for machine in schedule.values()
+                for task in machine
+            ]
+        )
+
     def total_setup_time(self, schedule: schedule_type) -> int:
         """Calculate the total setup time of the schedule.
 
