@@ -148,9 +148,6 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
     )
 
     # Floor function for start time day
-    # def floor_function_start(m, j):
-    #     return m.t[j] / (24 * 60) == m.sigma[j] + m.z[j]
-
     def floor_function_start(m, j):
         return m.t[j] / (24 * 60) == m.sigma[j] + m.z[j]
 
