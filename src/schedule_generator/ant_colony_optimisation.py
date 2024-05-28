@@ -1,4 +1,5 @@
 import time
+from typing import Self
 
 from matplotlib import pyplot as plt
 from src.production_orders import parse_data
@@ -311,6 +312,24 @@ class TwoStageACO:
                 self.generation_since_last_update = 0
             self.pheromones_stage_one *= 0.99
             self.pheromones_stage_two *= 0.99
+
+    def save(self, name: str):
+        np.savez_compressed(
+            file=f"{name}.npz",
+            stage_one=self.pheromones_stage_one,
+            stage_two=self.pheromones_stage_two,
+            best_solution_order=self.best_solution[1],
+            best_solution_info=np.array([self.best_solution[0], self.objective_function.value, self.tau_zero]),
+        )
+
+    @classmethod
+    def load(cls, name: str, jssp: JobShopProblem) -> Self:
+        data = np.load(f"{name}.npz")
+        aco = cls(jssp, ObjectiveFunction(data["best_solution_info"][1]), tau_zero=data["best_solution_info"][2])
+        aco.pheromones_stage_one = data["stage_one"]
+        aco.pheromones_stage_two = data["stage_two"]
+        aco.best_solution = (data["best_solution_info"][0], data["best_solution_order"])
+        return aco
 
 
 if __name__ == "__main__":
