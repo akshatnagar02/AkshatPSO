@@ -1,5 +1,6 @@
 """Mathematical model for the exact solution of the scheduling problem."""
 
+import typing
 import pyomo.environ as pyo
 from src.schedule_generator.main import JobShopProblem, schedule_type
 from src.production_orders import parse_data
@@ -220,7 +221,8 @@ def solve_model(model: pyo.ConcreteModel):
     return model
 
 
-def get_schedule(model: pyo.ConcreteModel, jssp: JobShopProblem) -> schedule_type:
+@typing.no_type_check
+def get_schedule(model: pyo.ConcreteModel, jssp: JobShopProblem) -> schedule_type: 
     job_start_times: dict[int, float] = {j: model.t[j].value for j in model.jobs}
     schedule: schedule_type = {
         m: [(-1, 0, jssp.machines[m].start_time)] for m in model.machines
@@ -242,6 +244,7 @@ def get_schedule(model: pyo.ConcreteModel, jssp: JobShopProblem) -> schedule_typ
     return schedule
 
 
+@typing.no_type_check
 def validate_schedule(model: pyo.ConcreteModel, schedule: schedule_type) -> bool:
     for machine, jobs in schedule.items():
         for job_idx, start_time, end_time in jobs:
