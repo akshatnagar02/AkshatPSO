@@ -717,7 +717,7 @@ class JobShopProblem:
         if self.LOW_TARDINESS is None:
             self.LOW_TARDINESS = 16.0
         if self.LOW_TOTAL_SETUP_TIME is None:
-            self.LOW_TOTAL_SETUP_TIME = 110.0
+            self.LOW_TOTAL_SETUP_TIME = 95.0
         if self.LOW_MAKESPAN is None:
             self.LOW_MAKESPAN = 3510.0
 
