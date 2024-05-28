@@ -706,7 +706,7 @@ class JobShopProblem:
         setup_time = 0
         for machine in schedule.values():
             for idx, task in enumerate(machine):
-                if idx > 0:
+                if idx > 0 and machine[idx - 1][0] != -1 and task[0] != -1:
                     setup_time += self.setup_times[machine[idx - 1][0], task[0]]
         return setup_time
 
