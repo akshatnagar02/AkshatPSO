@@ -267,7 +267,7 @@ class TwoStageACO:
                     jobs_to_schedule=machine_assignment[machine].difference(
                         jobs_assigned
                     ),
-                    last=schedules[machine][-1],
+                    last=schedules[machine][i],
                     machine=machine,
                 )
                 schedules[machine, i + 1] = job_idx
