@@ -653,7 +653,7 @@ class JobShopProblem:
         Returns:
             int: the makespan of the schedule
         """
-        return max([task[2] for machine in schedule.values() for task in machine])
+        return max([machine_schedule[-1][2] for machine_schedule in schedule.values()])
 
     def tardiness(self, schedule: schedule_type) -> int:
         """Calculate the tardiness of the schedule. The tardiness is the number of sub jobs that are late.
