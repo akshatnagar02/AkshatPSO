@@ -81,7 +81,6 @@ class TwoStageACO:
         self.with_stock_schedule = with_stock_schedule
         self.with_local_search = with_local_search
         self.local_search_iterations = local_search_iterations
-        self.generation_since_last_update = 0
 
     def evaluate(self, parallel_schedule: np.ndarray) -> float:
         """Evaluates the path and machine assignment."""
@@ -285,31 +284,25 @@ class TwoStageACO:
             if objective_value == 0:
                 raise KeyboardInterrupt
             self.best_solution = (objective_value, schedule)
-            self.generation_since_last_update = 0
             if self.verbose:
                 print(f"New best solution: {self.best_solution[0]}")
+        return objective_value
 
     def run(self):
         for gen in range(self.n_iter):
+            results = list()
             for _ in range(self.n_ants):
-                self.run_and_update_ant()
+                results.append(self.run_and_update_ant())
             if self.verbose:
                 print(
                     f"Generation {gen}, best objective value: {self.best_solution[0]}"
                 )
             elif gen % 10 == 0:
                 print(
-                    f"Generation {gen}, best objective value: {self.best_solution[0]}"
+                    f"Generation {gen}, best objective value: {self.best_solution[0]} "
+                    f"max={np.max(results):.3f},min={np.min(results):.3f},mean={np.mean(results):.3f},std={np.std(results):.3f}"
                 )
             self.global_update_pheromones()
-            self.generation_since_last_update += 1
-            if self.generation_since_last_update == 2500:
-                print("Resetting pheromones...")
-                self.pheromones_stage_one *= 0
-                self.pheromones_stage_one += 1
-                self.pheromones_stage_two *= 0
-                self.pheromones_stage_two += 1
-                self.generation_since_last_update = 0
             self.pheromones_stage_one *= 0.99
             self.pheromones_stage_two *= 0.99
 
@@ -323,9 +316,9 @@ class TwoStageACO:
         )
 
     @classmethod
-    def load(cls, name: str, jssp: JobShopProblem) -> Self:
+    def load(cls, name: str, jssp: JobShopProblem, **kwd) -> Self:
         data = np.load(f"{name}.npz")
-        aco = cls(jssp, ObjectiveFunction(data["best_solution_info"][1]), tau_zero=data["best_solution_info"][2])
+        aco = cls(jssp, ObjectiveFunction(data["best_solution_info"][1]), tau_zero=data["best_solution_info"][2], **kwd)
         aco.pheromones_stage_one = data["stage_one"]
         aco.pheromones_stage_two = data["stage_two"]
         aco.best_solution = (data["best_solution_info"][0], data["best_solution_order"])
