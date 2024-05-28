@@ -145,20 +145,17 @@ class TwoStageACO:
                 # Update stage two
                 last_job_idx = order[idx - 1]
                 self.pheromones_stage_two[last_job_idx, job_idx, m_idx] = (
-                    self.pheromones_stage_two[last_job_idx, job_idx, m_idx]
-                    * (1 - self.alpha)
-                    + self.alpha * inverse_best_value
+                    self.alpha * inverse_best_value
                 )
                 if job_idx == -1:
                     continue
                 # Update stage one
                 self.pheromones_stage_one[job_idx, m_idx] = (
-                    self.pheromones_stage_one[job_idx, m_idx] * (1 - self.alpha)
-                    + self.alpha * inverse_best_value
+                    self.alpha * inverse_best_value
                 )
 
     def local_update_pheromones(self, schedule: np.ndarray, objective_value: float):
-        inverse_objective_value = (1.0 / objective_value) / self.tau_zero
+        # inverse_objective_value = (1.0 / objective_value) / self.tau_zero
         for machine in range(len(self.problem.machines)):
             for idx, job_idx in enumerate(schedule[machine]):
                 if job_idx == -2:
@@ -170,14 +167,14 @@ class TwoStageACO:
                 self.pheromones_stage_two[last_job_idx, job_idx, machine] = (
                     self.pheromones_stage_two[last_job_idx, job_idx, machine]
                     * (1 - self.rho)
-                    + self.rho * inverse_objective_value
+                    # + self.rho * inverse_objective_value
                 )
                 if job_idx == -1:
                     continue
                 # Update stage one
                 self.pheromones_stage_one[job_idx, machine] = (
                     self.pheromones_stage_one[job_idx, machine] * (1 - self.rho)
-                    + self.rho * inverse_objective_value
+                    # + self.rho * inverse_objective_value
                 )
 
     def draw_job_to_schedule(
