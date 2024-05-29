@@ -653,7 +653,7 @@ class JobShopProblem:
         Returns:
             int: the makespan of the schedule
         """
-        return max([task[2] for machine in schedule.values() for task in machine])
+        return max([machine_schedule[-1][2] for machine_schedule in schedule.values()])
 
     def tardiness(self, schedule: schedule_type) -> int:
         """Calculate the tardiness of the schedule. The tardiness is the number of sub jobs that are late.
@@ -685,6 +685,15 @@ class JobShopProblem:
                 tardiness += np.max(lateness) * len(lateness)
         return int(tardiness)
 
+    def classical_tardiness(self, schedule: schedule_type) -> float:
+        return sum(
+            [
+                max(task[2] - self.jobs[task[0]].days_till_delivery * DAY_MINUTES, 0)
+                for machine in schedule.values()
+                for task in machine
+            ]
+        )
+
     def total_setup_time(self, schedule: schedule_type) -> int:
         """Calculate the total setup time of the schedule.
 
@@ -697,7 +706,7 @@ class JobShopProblem:
         setup_time = 0
         for machine in schedule.values():
             for idx, task in enumerate(machine):
-                if idx > 0:
+                if idx > 0 and machine[idx - 1][0] != -1 and task[0] != -1:
                     setup_time += self.setup_times[machine[idx - 1][0], task[0]]
         return setup_time
 
@@ -708,7 +717,7 @@ class JobShopProblem:
         if self.LOW_TARDINESS is None:
             self.LOW_TARDINESS = 16.0
         if self.LOW_TOTAL_SETUP_TIME is None:
-            self.LOW_TOTAL_SETUP_TIME = 110.0
+            self.LOW_TOTAL_SETUP_TIME = 95.0
         if self.LOW_MAKESPAN is None:
             self.LOW_MAKESPAN = 3510.0
 

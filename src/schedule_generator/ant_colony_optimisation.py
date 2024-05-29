@@ -1,4 +1,5 @@
 import time
+from typing import Self
 
 from matplotlib import pyplot as plt
 from src.production_orders import parse_data
@@ -80,7 +81,6 @@ class TwoStageACO:
         self.with_stock_schedule = with_stock_schedule
         self.with_local_search = with_local_search
         self.local_search_iterations = local_search_iterations
-        self.generation_since_last_update = 0
 
     def evaluate(self, parallel_schedule: np.ndarray) -> float:
         """Evaluates the path and machine assignment."""
@@ -145,20 +145,17 @@ class TwoStageACO:
                 # Update stage two
                 last_job_idx = order[idx - 1]
                 self.pheromones_stage_two[last_job_idx, job_idx, m_idx] = (
-                    self.pheromones_stage_two[last_job_idx, job_idx, m_idx]
-                    * (1 - self.alpha)
-                    + self.alpha * inverse_best_value
+                    self.alpha * inverse_best_value
                 )
                 if job_idx == -1:
                     continue
                 # Update stage one
                 self.pheromones_stage_one[job_idx, m_idx] = (
-                    self.pheromones_stage_one[job_idx, m_idx] * (1 - self.alpha)
-                    + self.alpha * inverse_best_value
+                    self.alpha * inverse_best_value
                 )
 
     def local_update_pheromones(self, schedule: np.ndarray, objective_value: float):
-        inverse_objective_value = (1.0 / objective_value) / self.tau_zero
+        # inverse_objective_value = (1.0 / objective_value) / self.tau_zero
         for machine in range(len(self.problem.machines)):
             for idx, job_idx in enumerate(schedule[machine]):
                 if job_idx == -2:
@@ -170,14 +167,14 @@ class TwoStageACO:
                 self.pheromones_stage_two[last_job_idx, job_idx, machine] = (
                     self.pheromones_stage_two[last_job_idx, job_idx, machine]
                     * (1 - self.rho)
-                    + self.rho * inverse_objective_value
+                    # + self.rho * inverse_objective_value
                 )
                 if job_idx == -1:
                     continue
                 # Update stage one
                 self.pheromones_stage_one[job_idx, machine] = (
                     self.pheromones_stage_one[job_idx, machine] * (1 - self.rho)
-                    + self.rho * inverse_objective_value
+                    # + self.rho * inverse_objective_value
                 )
 
     def draw_job_to_schedule(
@@ -266,7 +263,7 @@ class TwoStageACO:
                     jobs_to_schedule=machine_assignment[machine].difference(
                         jobs_assigned
                     ),
-                    last=schedules[machine][-1],
+                    last=schedules[machine][i],
                     machine=machine,
                 )
                 schedules[machine, i + 1] = job_idx
@@ -284,33 +281,45 @@ class TwoStageACO:
             if objective_value == 0:
                 raise KeyboardInterrupt
             self.best_solution = (objective_value, schedule)
-            self.generation_since_last_update = 0
             if self.verbose:
                 print(f"New best solution: {self.best_solution[0]}")
+        return objective_value
 
     def run(self):
         for gen in range(self.n_iter):
+            results = list()
             for _ in range(self.n_ants):
-                self.run_and_update_ant()
+                results.append(self.run_and_update_ant())
             if self.verbose:
                 print(
                     f"Generation {gen}, best objective value: {self.best_solution[0]}"
                 )
             elif gen % 10 == 0:
                 print(
-                    f"Generation {gen}, best objective value: {self.best_solution[0]}"
+                    f"Generation {gen}, best objective value: {self.best_solution[0]} "
+                    f"max={np.max(results):.3f},min={np.min(results):.3f},mean={np.mean(results):.3f},std={np.std(results):.3f}"
                 )
             self.global_update_pheromones()
-            self.generation_since_last_update += 1
-            if self.generation_since_last_update == 2500:
-                print("Resetting pheromones...")
-                self.pheromones_stage_one *= 0
-                self.pheromones_stage_one += 1
-                self.pheromones_stage_two *= 0
-                self.pheromones_stage_two += 1
-                self.generation_since_last_update = 0
             self.pheromones_stage_one *= 0.99
             self.pheromones_stage_two *= 0.99
+
+    def save(self, name: str):
+        np.savez_compressed(
+            file=f"{name}.npz",
+            stage_one=self.pheromones_stage_one,
+            stage_two=self.pheromones_stage_two,
+            best_solution_order=self.best_solution[1],
+            best_solution_info=np.array([self.best_solution[0], self.objective_function.value, self.tau_zero]),
+        )
+
+    @classmethod
+    def load(cls, name: str, jssp: JobShopProblem, **kwd) -> Self:
+        data = np.load(f"{name}.npz")
+        aco = cls(jssp, ObjectiveFunction(data["best_solution_info"][1]), tau_zero=data["best_solution_info"][2], **kwd)
+        aco.pheromones_stage_one = data["stage_one"]
+        aco.pheromones_stage_two = data["stage_two"]
+        aco.best_solution = (data["best_solution_info"][0], data["best_solution_order"])
+        return aco
 
 
 if __name__ == "__main__":
