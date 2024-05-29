@@ -490,12 +490,13 @@ class JobShopProblem:
             start_time = machine_start_time + (start_time // DAY_MINUTES) * DAY_MINUTES
             start_time_remainder = start_time % DAY_MINUTES
 
-        if start_time_remainder >= machine_end_time:
-            start_time = (start_time // DAY_MINUTES + 1) * DAY_MINUTES + machine_start_time
 
         if start_time_remainder + task_duration > machine_end_time:
             if machine_allow_preemption:
                 task_duration += DAY_MINUTES - machine_end_time + machine_start_time
+                while (start_time_remainder + task_duration) % DAY_MINUTES > machine_end_time:
+                    task_duration += DAY_MINUTES - machine_end_time + machine_start_time
+
             else:
                 start_time = (
                     machine_start_time + (start_time // DAY_MINUTES + 1) * DAY_MINUTES
