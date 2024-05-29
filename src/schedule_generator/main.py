@@ -130,7 +130,7 @@ class JobShopProblem:
                         alpha=0.5,
                     )
                     color = "black"
-                    if end_time - self.jobs[job_id].days_till_delivery * 24 * 60 > 0:
+                    if end_time - (self.jobs[job_id].days_till_delivery + 1) * 24 * 60 > 0:
                         color = "red"
 
                     ax.text(
@@ -490,6 +490,9 @@ class JobShopProblem:
             start_time = machine_start_time + (start_time // DAY_MINUTES) * DAY_MINUTES
             start_time_remainder = start_time % DAY_MINUTES
 
+        if start_time_remainder >= machine_end_time:
+            start_time = (start_time // DAY_MINUTES + 1) * DAY_MINUTES + machine_start_time
+
         if start_time_remainder + task_duration > machine_end_time:
             if machine_allow_preemption:
                 task_duration += DAY_MINUTES - machine_end_time + machine_start_time
@@ -680,7 +683,7 @@ class JobShopProblem:
                     self.jobs[task[0]].production_order_nr
                 ].append(
                     max(
-                        task[2] - self.jobs[task[0]].days_till_delivery * DAY_MINUTES, 0
+                        task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0
                     )
                 )
 
@@ -693,7 +696,7 @@ class JobShopProblem:
     def classical_tardiness(self, schedule: schedule_type) -> float:
         return sum(
             [
-                max(task[2] - self.jobs[task[0]].days_till_delivery * DAY_MINUTES, 0)
+                max(task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0)
                 for machine in schedule.values()
                 for task in machine
             ]
@@ -742,7 +745,7 @@ class JobShopProblem:
                     self.jobs[task[0]].production_order_nr
                 ].append(
                     max(
-                        task[2] - self.jobs[task[0]].days_till_delivery * DAY_MINUTES, 0
+                        task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0
                     )
                 )
 
@@ -760,6 +763,7 @@ class ObjectiveFunction(Enum):
     TARDINESS = 2
     TOTAL_SETUP_TIME = 3
     BOOLEAN_TARDINESS = 4
+    CLASSICAL_TARDINESS = 5
 
 
 if __name__ == "__main__":
