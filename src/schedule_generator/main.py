@@ -500,8 +500,13 @@ class JobShopProblem:
         return int(start_time), int(start_time + task_duration)
 
     def make_schedule_from_parallel_with_stock(
-        self, job_orders: np.ndarray
+        self, job_orders: np.ndarray | list[list[int]]
     ) -> schedule_type:
+        if isinstance(job_orders, list):
+            max_length = max([len(j) for j in job_orders])
+            job_orders = np.array(
+                [j + [-2] * (max_length - len(j)) for j in job_orders]
+            )
         schedule: dict[int, list[tuple[int, int, int]]] = {
             m.machine_id: [(-1, 0, m.start_time)] for m in self.machines
         }
