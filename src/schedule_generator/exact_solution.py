@@ -24,11 +24,15 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
     model.t = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=360)
     model.alpha = pyo.Var(model.jobs, model.machines, domain=pyo.Binary, initialize=0)
     model.beta = pyo.Var(model.jobs, model.jobs, domain=pyo.Binary, initialize=0)
-    model.sigma = pyo.Var(model.jobs,domain=pyo.Integers, initialize=0)
-    model.z = pyo.Var(model.jobs, bounds=(0,1), domain=pyo.NonNegativeReals, initialize=0.25)
-    # model.w = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0model.mu = pyo.Var(model.jobs, bounds=(-2,10), domain=pyo.Integers, initialize=-1)
-    # model.mu = pyo.Var(model.jobs, bounds=(-2,10), domain=pyo.Integers, initialize=-1)
-    # model.epsilon = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0)
+    model.sigma = pyo.Var(model.jobs, domain=pyo.Integers, initialize=0)
+    model.w = pyo.Var(
+        model.jobs, bounds=(0, 1), domain=pyo.NonNegativeReals, initialize=0
+    )
+    model.z = pyo.Var(
+        model.jobs, bounds=(0, 1), domain=pyo.NonNegativeReals, initialize=0
+    )
+    model.mu = pyo.Var(model.jobs, bounds=(-2, 10), domain=pyo.Integers, initialize=-1)
+    model.epsilon = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0)
 
     if True:
         model.tardiness = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0)
@@ -43,7 +47,7 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
             return (
                 m.tardiness[j]
                 >= m.t[j]
-                # + m.epsilon[j]
+                + m.epsilon[j]
                 + pyo.quicksum(
                     m.alpha[j, machine]
                     * jssp.jobs[j].available_machines.get(machine, 0)
@@ -67,7 +71,7 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
                     for machine in m.machines
                     if machine in jssp.jobs[j].available_machines
                 )
-                # + m.epsilon[j]
+                + m.epsilon[j]
             )
 
         model.calculate_makespan = pyo.Constraint(model.jobs, rule=calculate_makespan)
@@ -120,7 +124,7 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
                 >= m.t[j2]
                 + jssp.jobs[j2].available_machines[machine]
                 + jssp.setup_times[j2][j1]
-                # + m.epsilon[j2]
+                + m.epsilon[j2]
                 - (2 - m.alpha[j1, machine] - m.alpha[j2, machine] + m.beta[j1, j2]) * H
             )
 
@@ -204,7 +208,7 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
             )
         ) / (24 * 60) == m.mu[j] + m.z[j]
 
-    # model.floor_function_end = pyo.Constraint(model.jobs, rule=floor_function_end)
+    model.floor_function_end = pyo.Constraint(model.jobs, rule=floor_function_end)
 
     # Add extra time for downtime
     def add_extra_time(m, j):
@@ -220,13 +224,14 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
     return model
 
 
-def solve_model(model: pyo.ConcreteModel):
+def solve_model(model: pyo.ConcreteModel, time_limit: int | None = None):
     solver = pyo.SolverFactory("cplex")
+    solver.options["timelimit"] = time_limit
     res = solver.solve(model, tee=True)
     if res.solver.status != pyo.SolverStatus.ok:
         print("Check solver not ok...")
         raise Exception("Solver not ok")
-    if res.solver.termination_condition != pyo.TerminationCondition.optimal:
+    if res.solver.termination_condition != pyo.TerminationCondition.optimal and not time_limit:
         print("Could not find optimal solution, probably infeasible...")
         log_infeasible_constraints(
             model, logger=logger, log_expression=True, log_variables=True
@@ -289,23 +294,17 @@ def check_model_feasible(model: pyo.ConcreteModel) -> bool:
 
 
 if __name__ == "__main__":
-    jssp = JobShopProblem.from_data(parse_data("examples/data_v1.xlsx"))
-    # print("Data parsed...")
-    # print("Generating model...")
+    jssp = JobShopProblem.from_data(parse_data("examples/data_v1_single.xlsx"))
+    print("Data parsed...")
+    print("Generating model...")
     model = generate_model(jssp)
-    # print("Model generated...")
-    # print("Solving model...")
-
-    solve_model(model)
-    model.pprint(verbose=True)
-    # print("Model solved...")
+    print("Model generated...")
+    print("Solving model...")
+    solve_model(model, time_limit=60*5)
+    model.pprint()
+    print("Model solved...")
     sc = get_schedule(model, jssp)
     print(sc)
-    # sc = jssp.make_schedule_from_parallel(job_order)
-    # print("Schedule generated...")
-    # print("Validating schedule...")
-    # valid = validate_schedule(model, sc)
-    # print(f"Is schedule valid {valid}")
     print("Tardiness: ", jssp.makespan(sc))
     print("Linear tardiness: ", model.objective())
     jssp.visualize_schedule(sc)
