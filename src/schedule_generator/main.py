@@ -737,7 +737,7 @@ class JobShopProblem:
             self.LOW_TOTAL_SETUP_TIME = 35.0
         if self.LOW_MAKESPAN is None:
             # Normal
-            # self.LOW_MAKESPAN = 3510.0
+            # self.LOW_MAKESPAN = 3502.0
 
             # Small
             self.LOW_MAKESPAN = 2279.0
