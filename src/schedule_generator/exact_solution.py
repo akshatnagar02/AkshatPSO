@@ -1,10 +1,10 @@
 """Mathematical model for the exact solution of the scheduling problem."""
 
+import time
 import typing
 import pyomo.environ as pyo
 from src.schedule_generator.main import JobShopProblem, schedule_type
 from src.production_orders import parse_data
-import numpy as np
 from pyomo.util.infeasible import log_infeasible_constraints
 import logging
 
@@ -16,7 +16,17 @@ logger.addHandler(ch)
 H = 10e3
 
 
-def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
+def generate_model(jssp: JobShopProblem, tardiness_objective: bool = True) -> pyo.ConcreteModel:
+    """Generates a pyomo model for the job shop scheduling problem.
+
+    The model can either minimize the sum of tardiness or the makespan.
+    Args:
+        jssp (JobShopProblem): the job shop scheduling problem.
+        tardiness_objective (bool, optional): True if objective function is sum tardiness, otherwise it is makespan. Defaults to True.
+
+    Returns:
+        pyo.ConcreteModel: unsolved mathematical pyomo model.
+    """
     model = pyo.ConcreteModel()
     model.jobs = pyo.Set(initialize=range(len(jssp.jobs)))
     model.machines = pyo.Set(initialize=range(len(jssp.machines)))
@@ -34,7 +44,7 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
     model.mu = pyo.Var(model.jobs, bounds=(-2, 10), domain=pyo.Integers, initialize=-1)
     model.epsilon = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0)
 
-    if False:
+    if tardiness_objective:
         model.tardiness = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0)
 
         model.objective = pyo.Objective(
@@ -280,22 +290,19 @@ def check_model_feasible(model: pyo.ConcreteModel) -> bool:
 
 
 if __name__ == "__main__":
-    jssp = JobShopProblem.from_data(parse_data("examples/data_v1_small.xlsx"))
-    from src.schedule_generator.main import Job
-    jssp.jobs = [
-        Job(available_machines={0: 700}, dependencies=[], production_order_nr="P0")
-    ] * 9
-    jssp.setup_times *= 0
+    jssp = JobShopProblem.from_data(parse_data("examples/data_v1.xlsx"))
     print("Data parsed...")
     print("Generating model...")
     model = generate_model(jssp)
     print("Model generated...")
     print("Solving model...")
-    solve_model(model, time_limit=60*5)
-    model.pprint()
+    start_time = time.time()
+    solve_model(model, time_limit=3*60*60)
+    end_time = time.time()
     print("Model solved...")
     sc = get_schedule(model, jssp)
     print(sc)
-    print("Tardiness: ", jssp.makespan(sc))
-    print("Linear tardiness: ", model.objective())
+    print("Makespan: ", jssp.makespan(sc))
+    print("Linear Makespan: ", model.objective())
+    print("Time: ", end_time - start_time)
     jssp.visualize_schedule(sc)
