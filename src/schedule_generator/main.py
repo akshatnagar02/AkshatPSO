@@ -725,22 +725,22 @@ class JobShopProblem:
         makespan = self.makespan(schedule)
         if self.LOW_TARDINESS is None:
             # Normal
-            # self.LOW_TARDINESS = 8.0
+            self.LOW_TARDINESS = 8.0
 
             # Small
-            self.LOW_TARDINESS = 0.1
+            # self.LOW_TARDINESS = 0.1
         if self.LOW_TOTAL_SETUP_TIME is None:
             # Normal
-            # self.LOW_TOTAL_SETUP_TIME = 95.0
+            self.LOW_TOTAL_SETUP_TIME = 95.0
             
             # Small
-            self.LOW_TOTAL_SETUP_TIME = 35.0
+            # self.LOW_TOTAL_SETUP_TIME = 35.0
         if self.LOW_MAKESPAN is None:
             # Normal
-            # self.LOW_MAKESPAN = 3502.0
+            self.LOW_MAKESPAN = 3502.0
 
             # Small
-            self.LOW_MAKESPAN = 2279.0
+            # self.LOW_MAKESPAN = 2279.0
 
         return (
             (tardiness - self.LOW_TARDINESS) / self.LOW_TARDINESS
