@@ -34,7 +34,7 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
     model.mu = pyo.Var(model.jobs, bounds=(-2, 10), domain=pyo.Integers, initialize=-1)
     model.epsilon = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0)
 
-    if True:
+    if False:
         model.tardiness = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0)
 
         model.objective = pyo.Objective(
@@ -270,20 +270,6 @@ def get_schedule(model: pyo.ConcreteModel, jssp: JobShopProblem) -> schedule_typ
     return schedule
 
 
-@typing.no_type_check
-def validate_schedule(model: pyo.ConcreteModel, schedule: schedule_type) -> bool:
-    for machine, jobs in schedule.items():
-        for job_idx, start_time, end_time in jobs:
-            if job_idx in [-1, -2]:
-                continue
-            if abs(model.t[job_idx].value - start_time) > 1e-2:
-                print(
-                    f"Error: Start time does not match for job {job_idx}, machine {machine}, expected {model.t[job_idx].value}, got {start_time}"
-                )
-                return False
-    return True
-
-
 def check_model_feasible(model: pyo.ConcreteModel) -> bool:
     for c in model.component_objects(pyo.Constraint, active=True):
         for i in c:
@@ -294,7 +280,12 @@ def check_model_feasible(model: pyo.ConcreteModel) -> bool:
 
 
 if __name__ == "__main__":
-    jssp = JobShopProblem.from_data(parse_data("examples/data_v1_single.xlsx"))
+    jssp = JobShopProblem.from_data(parse_data("examples/data_v1_small.xlsx"))
+    from src.schedule_generator.main import Job
+    jssp.jobs = [
+        Job(available_machines={0: 700}, dependencies=[], production_order_nr="P0")
+    ] * 9
+    jssp.setup_times *= 0
     print("Data parsed...")
     print("Generating model...")
     model = generate_model(jssp)
