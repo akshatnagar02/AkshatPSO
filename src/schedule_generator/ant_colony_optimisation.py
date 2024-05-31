@@ -226,7 +226,7 @@ class TwoStageACO:
         for _ in range(self.local_search_iterations):
             x = np.random.rand()
             operation = (0, 0, 0)
-            if x < 0.5:
+            if x < 1:
                 # Swap two jobs on the same machine
                 machine = np.random.randint(len(self.problem.machines))
                 number_of_jobs_on_machine = len(machine_assignment[machine])
@@ -282,8 +282,6 @@ class TwoStageACO:
             objective_value = self.evaluate(schedule)
         self.local_update_pheromones(schedule, objective_value)
         if objective_value <= self.best_solution[0]:
-            if objective_value == 0:
-                raise KeyboardInterrupt
             self.best_solution = (objective_value, schedule)
             if self.verbose:
                 print(f"New best solution: {self.best_solution[0]}")
@@ -295,6 +293,10 @@ class TwoStageACO:
             results = list()
             for _ in range(self.n_ants):
                 results.append(self.run_and_update_ant())
+            minimum = np.min(results)
+            if minimum == 0:
+                print("Optimal solution found stopping...")
+                break
             if self.verbose:
                 print(
                     f"Generation {gen}, best objective value: {self.best_solution[0]}"
@@ -302,7 +304,7 @@ class TwoStageACO:
             elif gen % 10 == 0:
                 print(
                     f"Generation {gen}, best objective value: {self.best_solution[0]} "
-                    f"max={np.max(results):.3f},min={np.min(results):.3f},mean={np.mean(results):.3f},std={np.std(results):.3f}"
+                    f"max={np.max(results):.3f},min={minimum:.3f},mean={np.mean(results):.3f},std={np.std(results):.3f}"
                 )
             self.global_update_pheromones()
             self.pheromones_stage_one *= 0.99
