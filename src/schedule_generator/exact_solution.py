@@ -1,10 +1,10 @@
 """Mathematical model for the exact solution of the scheduling problem."""
 
+import time
 import typing
 import pyomo.environ as pyo
 from src.schedule_generator.main import JobShopProblem, schedule_type
 from src.production_orders import parse_data
-import numpy as np
 from pyomo.util.infeasible import log_infeasible_constraints
 import logging
 
@@ -16,7 +16,17 @@ logger.addHandler(ch)
 H = 10e3
 
 
-def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
+def generate_model(jssp: JobShopProblem, tardiness_objective: bool = True) -> pyo.ConcreteModel:
+    """Generates a pyomo model for the job shop scheduling problem.
+
+    The model can either minimize the sum of tardiness or the makespan.
+    Args:
+        jssp (JobShopProblem): the job shop scheduling problem.
+        tardiness_objective (bool, optional): True if objective function is sum tardiness, otherwise it is makespan. Defaults to True.
+
+    Returns:
+        pyo.ConcreteModel: unsolved mathematical pyomo model.
+    """
     model = pyo.ConcreteModel()
     model.jobs = pyo.Set(initialize=range(len(jssp.jobs)))
     model.machines = pyo.Set(initialize=range(len(jssp.machines)))
@@ -24,32 +34,37 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
     model.t = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=360)
     model.alpha = pyo.Var(model.jobs, model.machines, domain=pyo.Binary, initialize=0)
     model.beta = pyo.Var(model.jobs, model.jobs, domain=pyo.Binary, initialize=0)
-    model.sigma = pyo.Var(model.jobs,domain=pyo.Integers, initialize=0)
-    model.z = pyo.Var(model.jobs, bounds=(0,1), domain=pyo.NonNegativeReals, initialize=0.25)
-    # model.w = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0model.mu = pyo.Var(model.jobs, bounds=(-2,10), domain=pyo.Integers, initialize=-1)
-    # model.mu = pyo.Var(model.jobs, bounds=(-2,10), domain=pyo.Integers, initialize=-1)
-    # model.epsilon = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0)
+    model.sigma = pyo.Var(model.jobs, domain=pyo.Integers, initialize=0)
+    model.w = pyo.Var(
+        model.jobs, bounds=(0, 1), domain=pyo.NonNegativeReals, initialize=0
+    )
+    model.z = pyo.Var(
+        model.jobs, bounds=(0, 1), domain=pyo.NonNegativeReals, initialize=0
+    )
+    model.mu = pyo.Var(model.jobs, bounds=(-2, 10), domain=pyo.Integers, initialize=-1)
+    model.epsilon = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0)
 
-    if False:
+    if tardiness_objective:
         model.tardiness = pyo.Var(model.jobs, domain=pyo.NonNegativeReals, initialize=0)
 
-        # model.objective = pyo.Objective(
-        #     expr=pyo.quicksum(model.tardiness[j] for j in model.jobs), sense=pyo.minimize
-        # )
+        model.objective = pyo.Objective(
+            expr=pyo.quicksum(model.tardiness[j] for j in model.jobs),
+            sense=pyo.minimize,
+        )
 
         # Calculate tardiness for each job
         def calculate_tardiness(m, j):
             return (
                 m.tardiness[j]
                 >= m.t[j]
-                # + m.epsilon[j]
+                + m.epsilon[j]
                 + pyo.quicksum(
                     m.alpha[j, machine]
                     * jssp.jobs[j].available_machines.get(machine, 0)
                     for machine in m.machines
                     if machine in jssp.jobs[j].available_machines
                 )
-                - jssp.jobs[j].days_till_delivery * 24 * 60
+                - (jssp.jobs[j].days_till_delivery + 1) * 24 * 60
             )
 
         model.calculate_tardiness = pyo.Constraint(model.jobs, rule=calculate_tardiness)
@@ -66,7 +81,7 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
                     for machine in m.machines
                     if machine in jssp.jobs[j].available_machines
                 )
-                # + m.epsilon[j]
+                + m.epsilon[j]
             )
 
         model.calculate_makespan = pyo.Constraint(model.jobs, rule=calculate_makespan)
@@ -90,7 +105,7 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
         if len(jssp.jobs[j1].dependencies) > 0 and j2 in jssp.jobs[j1].dependencies:
             return m.t[j1] >= (
                 m.t[j2]
-                # + m.epsilon[j2]
+                + m.epsilon[j2]
                 + pyo.quicksum(
                     m.alpha[j2, machine]
                     * jssp.jobs[j2].available_machines.get(machine, 0)
@@ -119,7 +134,7 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
                 >= m.t[j2]
                 + jssp.jobs[j2].available_machines[machine]
                 + jssp.setup_times[j2][j1]
-                # + m.epsilon[j2]
+                + m.epsilon[j2]
                 - (2 - m.alpha[j1, machine] - m.alpha[j2, machine] + m.beta[j1, j2]) * H
             )
 
@@ -140,7 +155,7 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
                 >= m.t[j1]
                 + jssp.jobs[j1].available_machines[machine]
                 + jssp.setup_times[j1][j2]
-                # + m.epsilon[j1]
+                + m.epsilon[j1]
                 - (3 - m.alpha[j1, machine] - m.alpha[j2, machine] - m.beta[j1, j2]) * H
             )
 
@@ -150,7 +165,7 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
 
     # Floor function for start time day
     def floor_function_start(m, j):
-        return m.t[j] / (24 * 60) == m.sigma[j] + m.z[j]
+        return m.t[j] / (24 * 60) == m.sigma[j] + m.w[j]
 
     model.floor_function_start = pyo.Constraint(model.jobs, rule=floor_function_start)
 
@@ -186,33 +201,47 @@ def generate_model(jssp: JobShopProblem) -> pyo.ConcreteModel:
             if machine in jssp.jobs[j].available_machines
         )
 
-    model.end_of_day = pyo.Constraint(model.jobs, rule=end_of_day)
+    # model.end_of_day = pyo.Constraint(model.jobs, rule=end_of_day)
 
-    # # Floor function for end time day
-    # def floor_function_end(m, j):
-    #     return (m.t[j]+pyo.quicksum(m.alpha[j, machine] * (jssp.jobs[j].available_machines[machine] - jssp.machines[machine].end_time) for machine in m.machines if machine in jssp.jobs[j].available_machines))/(24*60) == m.mu[j] + m.w[j]
+    # Floor function for end time day
+    def floor_function_end(m, j):
+        return (
+            m.t[j]
+            + pyo.quicksum(
+                m.alpha[j, machine]
+                * (
+                    jssp.jobs[j].available_machines[machine]
+                    - jssp.machines[machine].end_time
+                )
+                for machine in m.machines
+                if machine in jssp.jobs[j].available_machines
+            )
+        ) / (24 * 60) == m.mu[j] + m.z[j]
 
-    # model.floor_function_end = pyo.Constraint(model.jobs, rule=floor_function_end)
+    model.floor_function_end = pyo.Constraint(model.jobs, rule=floor_function_end)
 
-    # # Add extra time for downtime
-    # def add_extra_time(m, j, machine):
-    #     if machine not in jssp.jobs[j].available_machines:
-    #         return pyo.Constraint.Skip
-    #     else:
-    #         return m.t[j] + m.epsilon[j] >= 24*60 * (m.mu[j] + 1) + jssp.machines[machine].start_time - 24 * 60 * m.z[j] - (1-m.alpha[j, machine]) * H
+    # Add extra time for downtime
+    def add_extra_time(m, j):
+        return m.epsilon[j] >= 24 * 60 * (m.mu[j] - m.sigma[j] + 1) + pyo.quicksum(
+            m.alpha[j, machine]
+            * (jssp.machines[machine].start_time - jssp.machines[machine].end_time)
+            for machine in m.machines
+            if machine in jssp.jobs[j].available_machines
+        )
 
-    # model.add_extra_time = pyo.Constraint(model.jobs, model.machines, rule=add_extra_time)
+    model.add_extra_time = pyo.Constraint(model.jobs, rule=add_extra_time)
 
     return model
 
 
-def solve_model(model: pyo.ConcreteModel):
+def solve_model(model: pyo.ConcreteModel, time_limit: int | None = None):
     solver = pyo.SolverFactory("cplex")
+    solver.options["timelimit"] = time_limit
     res = solver.solve(model, tee=True)
     if res.solver.status != pyo.SolverStatus.ok:
         print("Check solver not ok...")
         raise Exception("Solver not ok")
-    if res.solver.termination_condition != pyo.TerminationCondition.optimal:
+    if res.solver.termination_condition != pyo.TerminationCondition.optimal and not time_limit:
         print("Could not find optimal solution, probably infeasible...")
         log_infeasible_constraints(
             model, logger=logger, log_expression=True, log_variables=True
@@ -222,7 +251,7 @@ def solve_model(model: pyo.ConcreteModel):
 
 
 @typing.no_type_check
-def get_schedule(model: pyo.ConcreteModel, jssp: JobShopProblem) -> schedule_type: 
+def get_schedule(model: pyo.ConcreteModel, jssp: JobShopProblem) -> schedule_type:
     job_start_times: dict[int, float] = {j: model.t[j].value for j in model.jobs}
     schedule: schedule_type = {
         m: [(-1, 0, jssp.machines[m].start_time)] for m in model.machines
@@ -236,26 +265,19 @@ def get_schedule(model: pyo.ConcreteModel, jssp: JobShopProblem) -> schedule_typ
                 if len(schedule[m]) > 1:
                     last_job_idx, _, _ = schedule[m][-1]
                     setup_time = jssp.setup_times[last_job_idx][j]
-                end_time = start_time + jssp.jobs[j].available_machines[m] + setup_time
+                end_time = start_time + jssp.jobs[j].available_machines[m]
+                start_time, end_time = jssp._calculate_start_and_end_time(
+                    machine_allow_preemption=True,
+                    machine_start_time=jssp.machines[m].start_time,
+                    machine_end_time=jssp.machines[m].end_time,
+                    start_time=start_time,
+                    task_duration=end_time - start_time,
+                )
                 schedule[m].append((j, start_time, end_time))
                 found = True
             elif found and model.alpha[j, m].value == 1:
                 print("Error: Multiple machines assigned to job")
     return schedule
-
-
-@typing.no_type_check
-def validate_schedule(model: pyo.ConcreteModel, schedule: schedule_type) -> bool:
-    for machine, jobs in schedule.items():
-        for job_idx, start_time, end_time in jobs:
-            if job_idx in [-1, -2]:
-                continue
-            if abs(model.t[job_idx].value - start_time) > 1e-2:
-                print(
-                    f"Error: Start time does not match for job {job_idx}, machine {machine}, expected {model.t[job_idx].value}, got {start_time}"
-                )
-                return False
-    return True
 
 
 def check_model_feasible(model: pyo.ConcreteModel) -> bool:
@@ -269,22 +291,18 @@ def check_model_feasible(model: pyo.ConcreteModel) -> bool:
 
 if __name__ == "__main__":
     jssp = JobShopProblem.from_data(parse_data("examples/data_v1.xlsx"))
-    # print("Data parsed...")
-    # print("Generating model...")
+    print("Data parsed...")
+    print("Generating model...")
     model = generate_model(jssp)
-    # print("Model generated...")
-    # print("Solving model...")
-
-    solve_model(model)
-    model.pprint(verbose=True)
-    # print("Model solved...")
+    print("Model generated...")
+    print("Solving model...")
+    start_time = time.time()
+    solve_model(model, time_limit=3*60*60)
+    end_time = time.time()
+    print("Model solved...")
     sc = get_schedule(model, jssp)
     print(sc)
-    # sc = jssp.make_schedule_from_parallel(job_order)
-    # print("Schedule generated...")
-    # print("Validating schedule...")
-    # valid = validate_schedule(model, sc)
-    # print(f"Is schedule valid {valid}")
-    print("Tardiness: ", jssp.makespan(sc))
-    print("Linear tardiness: ", model.objective())
+    print("Makespan: ", jssp.makespan(sc))
+    print("Linear Makespan: ", model.objective())
+    print("Time: ", end_time - start_time)
     jssp.visualize_schedule(sc)

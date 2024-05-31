@@ -100,6 +100,8 @@ class TwoStageACO:
             return self.problem.custom_objective(schedule)
         elif self.objective_function == ObjectiveFunction.BOOLEAN_TARDINESS:
             return self.problem.boolean_tardiness(schedule)
+        elif self.objective_function == ObjectiveFunction.CLASSICAL_TARDINESS:
+            return self.problem.classical_tardiness(schedule)
         else:
             raise ValueError(
                 f"Objective function {self.objective_function} not supported."
@@ -144,11 +146,13 @@ class TwoStageACO:
                     continue
                 # Update stage two
                 last_job_idx = order[idx - 1]
+                # self.pheromones_stage_two *= (1 - self.alpha)
                 self.pheromones_stage_two[last_job_idx, job_idx, m_idx] = (
                     self.alpha * inverse_best_value
                 )
                 if job_idx == -1:
                     continue
+                # self.pheromones_stage_one *= (1 - self.alpha)
                 # Update stage one
                 self.pheromones_stage_one[job_idx, m_idx] = (
                     self.alpha * inverse_best_value
@@ -222,7 +226,7 @@ class TwoStageACO:
         for _ in range(self.local_search_iterations):
             x = np.random.rand()
             operation = (0, 0, 0)
-            if x < 0.5:
+            if x < 1:
                 # Swap two jobs on the same machine
                 machine = np.random.randint(len(self.problem.machines))
                 number_of_jobs_on_machine = len(machine_assignment[machine])
@@ -278,18 +282,21 @@ class TwoStageACO:
             objective_value = self.evaluate(schedule)
         self.local_update_pheromones(schedule, objective_value)
         if objective_value <= self.best_solution[0]:
-            if objective_value == 0:
-                raise KeyboardInterrupt
             self.best_solution = (objective_value, schedule)
             if self.verbose:
                 print(f"New best solution: {self.best_solution[0]}")
         return objective_value
 
     def run(self):
+        min_same = 0
         for gen in range(self.n_iter):
             results = list()
             for _ in range(self.n_ants):
                 results.append(self.run_and_update_ant())
+            minimum = np.min(results)
+            if minimum == 0:
+                print("Optimal solution found stopping...")
+                break
             if self.verbose:
                 print(
                     f"Generation {gen}, best objective value: {self.best_solution[0]}"
@@ -297,11 +304,20 @@ class TwoStageACO:
             elif gen % 10 == 0:
                 print(
                     f"Generation {gen}, best objective value: {self.best_solution[0]} "
-                    f"max={np.max(results):.3f},min={np.min(results):.3f},mean={np.mean(results):.3f},std={np.std(results):.3f}"
+                    f"max={np.max(results):.3f},min={minimum:.3f},mean={np.mean(results):.3f},std={np.std(results):.3f}"
                 )
             self.global_update_pheromones()
             self.pheromones_stage_one *= 0.99
             self.pheromones_stage_two *= 0.99
+            if abs(np.min(results) - self.best_solution[0]) < 1e-6:
+                min_same += 1
+            else:
+                min_same = 0
+            if min_same == 10:
+                print("Resetting pheromones")
+                self.pheromones_stage_one = self.pheromones_stage_one * 0 + 1
+                self.pheromones_stage_two = self.pheromones_stage_two * 0 + 1
+                min_same = 0
 
     def save(self, name: str):
         np.savez_compressed(
@@ -324,33 +340,38 @@ class TwoStageACO:
 
 if __name__ == "__main__":
     data = parse_data(
-        r"B:\Documents\Skola\UvA\Y3P6\git_folder\src\examples\data_v1.xlsx"
+        r"B:\Documents\Skola\UvA\Y3P6\git_folder\src\examples\data_v1_single.xlsx"
     )
     jssp = JobShopProblem.from_data(data)
     aco = TwoStageACO(
         jssp,
-        ObjectiveFunction.MAKESPAN,
+        ObjectiveFunction.CLASSICAL_TARDINESS,
         verbose=False,
-        n_iter=400,
-        n_ants=100,
-        tau_zero=1.0 / (3510),
-        q_zero=0.85,
+        n_iter=5000,
+        n_ants=10,
+        tau_zero=1.0 / (590.0),
+        q_zero=0.9,
         with_stock_schedule=True,
-        seed=5342,
+        seed=20534043,
         with_local_search=False,
-        local_search_iterations=20,
+        local_search_iterations=30,
         alpha=0.1,
         rho=0.01,
     )
+    # aco = TwoStageACO.load("custom_version_1_0", jssp, n_iter=10000, n_ants = 10, seed=2358002486, with_stock_schedule=True, rho=0.01, with_local_search=False, q_zero=0.95)
     start_time = time.time()
     aco.run()
     print(f"Time taken: {time.time() - start_time}")
     print(aco.best_solution)
     sc = aco.problem.make_schedule_from_parallel_with_stock(aco.best_solution[1])
+    print(f"custom: {jssp.custom_objective(sc):.3f}, makespan: {jssp.makespan(sc):.3f}, boolean tardiness: {jssp.boolean_tardiness(sc):.3f}, total setup time: {jssp.total_setup_time(sc):.3f}")
+    print(f"{jssp.classical_tardiness(sc)}")
     aco.problem.visualize_schedule(sc)
-    plt.imshow(aco.pheromones_stage_one)
-    plt.colorbar()
-    plt.show()
+
+    aco.save("custom_version_1_0")
+    # plt.imshow(aco.pheromones_stage_one)
+    # plt.colorbar()
+    # plt.show()
     # aco.problem.visualize_schedule(
     #     aco.problem.make_schedule_from_parallel(aco.best_solution[1])
     # )

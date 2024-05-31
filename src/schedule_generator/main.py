@@ -130,7 +130,7 @@ class JobShopProblem:
                         alpha=0.5,
                     )
                     color = "black"
-                    if end_time - self.jobs[job_id].days_till_delivery * 24 * 60 > 0:
+                    if end_time - (self.jobs[job_id].days_till_delivery + 1) * 24 * 60 > 0:
                         color = "red"
 
                     ax.text(
@@ -490,9 +490,13 @@ class JobShopProblem:
             start_time = machine_start_time + (start_time // DAY_MINUTES) * DAY_MINUTES
             start_time_remainder = start_time % DAY_MINUTES
 
+
         if start_time_remainder + task_duration > machine_end_time:
             if machine_allow_preemption:
                 task_duration += DAY_MINUTES - machine_end_time + machine_start_time
+                while (start_time_remainder + task_duration) % DAY_MINUTES > machine_end_time:
+                    task_duration += DAY_MINUTES - machine_end_time + machine_start_time
+
             else:
                 start_time = (
                     machine_start_time + (start_time // DAY_MINUTES + 1) * DAY_MINUTES
@@ -500,8 +504,13 @@ class JobShopProblem:
         return int(start_time), int(start_time + task_duration)
 
     def make_schedule_from_parallel_with_stock(
-        self, job_orders: np.ndarray
+        self, job_orders: np.ndarray | list[list[int]]
     ) -> schedule_type:
+        if isinstance(job_orders, list):
+            max_length = max([len(j) for j in job_orders])
+            job_orders = np.array(
+                [j + [-2] * (max_length - len(j)) for j in job_orders]
+            )
         schedule: dict[int, list[tuple[int, int, int]]] = {
             m.machine_id: [(-1, 0, m.start_time)] for m in self.machines
         }
@@ -675,7 +684,7 @@ class JobShopProblem:
                     self.jobs[task[0]].production_order_nr
                 ].append(
                     max(
-                        task[2] - self.jobs[task[0]].days_till_delivery * DAY_MINUTES, 0
+                        task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0
                     )
                 )
 
@@ -688,7 +697,7 @@ class JobShopProblem:
     def classical_tardiness(self, schedule: schedule_type) -> float:
         return sum(
             [
-                max(task[2] - self.jobs[task[0]].days_till_delivery * DAY_MINUTES, 0)
+                max(task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0)
                 for machine in schedule.values()
                 for task in machine
             ]
@@ -715,11 +724,23 @@ class JobShopProblem:
         total_setup_time = self.total_setup_time(schedule)
         makespan = self.makespan(schedule)
         if self.LOW_TARDINESS is None:
-            self.LOW_TARDINESS = 16.0
+            # Normal
+            self.LOW_TARDINESS = 8.0
+
+            # Small
+            # self.LOW_TARDINESS = 0.1
         if self.LOW_TOTAL_SETUP_TIME is None:
+            # Normal
             self.LOW_TOTAL_SETUP_TIME = 95.0
+            
+            # Small
+            # self.LOW_TOTAL_SETUP_TIME = 35.0
         if self.LOW_MAKESPAN is None:
-            self.LOW_MAKESPAN = 3510.0
+            # Normal
+            self.LOW_MAKESPAN = 3502.0
+
+            # Small
+            # self.LOW_MAKESPAN = 2279.0
 
         return (
             (tardiness - self.LOW_TARDINESS) / self.LOW_TARDINESS
@@ -737,7 +758,7 @@ class JobShopProblem:
                     self.jobs[task[0]].production_order_nr
                 ].append(
                     max(
-                        task[2] - self.jobs[task[0]].days_till_delivery * DAY_MINUTES, 0
+                        task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0
                     )
                 )
 
@@ -755,6 +776,7 @@ class ObjectiveFunction(Enum):
     TARDINESS = 2
     TOTAL_SETUP_TIME = 3
     BOOLEAN_TARDINESS = 4
+    CLASSICAL_TARDINESS = 5
 
 
 if __name__ == "__main__":
