@@ -72,7 +72,11 @@ class JobShopProblem:
                 graph.add_edge(node, -2)
         return graph
 
-    def new_visualize_schedule(self, schedule: dict[int, list[tuple[int, int, int]]], save_path: str | None = None):
+    def new_visualize_schedule(
+        self,
+        schedule: dict[int, list[tuple[int, int, int]]],
+        save_path: str | None = None,
+    ):
         fig, ax = plt.subplots(figsize=(26, 7))
         cmap = plt.get_cmap("tab20")
         flavour_mapping = {"cola": 0, "fanta": 1}
@@ -93,54 +97,109 @@ class JobShopProblem:
                         to_be_plotted.append((start_time, start_time + setup_time))
                     for plot_idx, times in enumerate(to_be_plotted):
                         kwargs = {
-                            # "hatch": "O", 
-                            "facecolor": cmap(flavour_mapping[flavour]), "edgecolor": "black"
+                            # "hatch": "O",
+                            "facecolor": cmap(flavour_mapping[flavour]),
+                            "edgecolor": "black",
                         }
                         if plot_idx == 1:
                             kwargs["hatch"] = "/"
-                        ax.broken_barh([(times[0], times[1] - times[0])], (i-0.25, 0.5), **kwargs)
+                        ax.broken_barh(
+                            [(times[0], times[1] - times[0])], (i - 0.25, 0.5), **kwargs
+                        )
                 else:
                     # List with tuples of (start time, end time, is setup?)
                     to_be_plotted = list()
                     # Check if we need to split into multiple parts because of preemption
-                    if end_time - start_time - setup_time> self.jobs[job_id].available_machines[machine]:
+                    if (
+                        end_time - start_time - setup_time
+                        > self.jobs[job_id].available_machines[machine]
+                    ):
                         # How many days are we splitting it into?
-                        no_days = (end_time - start_time - setup_time) // DAY_MINUTES + 1
+                        no_days = (
+                            end_time - start_time - setup_time
+                        ) // DAY_MINUTES + 1
                         start_day = start_time // DAY_MINUTES
                         if no_days == 1:
-                            if (start_time + setup_time) % DAY_MINUTES > self.machines[machine].end_time:...
-                                # to_be_plotted.append((start_time, self.machines[machine].end_time + DAY_MINUTES * start_day, True))
-                                # to_be_plotted.append((self.machines[machine].start_time + DAY_MINUTES * (start_day + 1), self.machines[machine].start_time + DAY_MINUTES * (start_day + 1) + (DAY_MINUTES - start_time + setup_time) % DAY_MINUTES, True))
-                                # to_be_plotted.append((self.machines[machine].start_time + DAY_MINUTES * (start_day + 1), end_time, False))
+                            if (start_time + setup_time) % DAY_MINUTES > self.machines[
+                                machine
+                            ].end_time:
+                                to_be_plotted.append(
+                                    (
+                                        start_time,
+                                        self.machines[machine].end_time
+                                        + DAY_MINUTES * start_day,
+                                        True,
+                                    )
+                                )
+                                to_be_plotted.append(
+                                    (
+                                        self.machines[machine].start_time
+                                        + DAY_MINUTES * (start_day + 1),
+                                        self.machines[machine].start_time
+                                        + DAY_MINUTES * (start_day + 1)
+                                        + (DAY_MINUTES - start_time + setup_time)
+                                        % DAY_MINUTES,
+                                        True,
+                                    )
+                                )
+                                to_be_plotted.append(
+                                    (
+                                        self.machines[machine].start_time
+                                        + DAY_MINUTES * (start_day + 1),
+                                        end_time,
+                                        False,
+                                    )
+                                )
                             else:
-                                to_be_plotted.append((start_time, start_time + setup_time, True))
-                                to_be_plotted.append((start_time + setup_time, self.machines[machine].end_time + DAY_MINUTES * start_day, False))
-                                to_be_plotted.append((self.machines[machine].start_time + DAY_MINUTES * (start_day + 1), end_time, False))
-                                print(to_be_plotted)
+                                to_be_plotted.append(
+                                    (start_time, start_time + setup_time, True)
+                                )
+                                to_be_plotted.append(
+                                    (
+                                        start_time + setup_time,
+                                        self.machines[machine].end_time
+                                        + DAY_MINUTES * start_day,
+                                        False,
+                                    )
+                                )
+                                to_be_plotted.append(
+                                    (
+                                        self.machines[machine].start_time
+                                        + DAY_MINUTES * (start_day + 1),
+                                        end_time,
+                                        False,
+                                    )
+                                )
 
-                            
                     else:
                         if setup_time > 0:
-                            to_be_plotted.append((start_time, start_time+setup_time, True))
-                        to_be_plotted.append((start_time+setup_time, end_time, False))
+                            to_be_plotted.append(
+                                (start_time, start_time + setup_time, True)
+                            )
+                        to_be_plotted.append((start_time + setup_time, end_time, False))
                     for current_plot in to_be_plotted:
                         kwargs = {
-                            # "hatch": "O", 
-                            "facecolor": cmap(flavour_mapping[flavour]), "edgecolor": "black"
+                            # "hatch": "O",
+                            "facecolor": cmap(flavour_mapping[flavour]),
+                            "edgecolor": "black",
                         }
                         if current_plot[2]:
                             kwargs["hatch"] = "/"
                         else:
                             ax.text(
-                            (current_plot[0] + current_plot[1]) / 2,
-                            i,
-                            self.jobs[job_id].production_order_nr,
-                            va="center",
-                            ha="center",
-                            fontsize=21,
-                            color="white",
+                                (current_plot[0] + current_plot[1]) / 2,
+                                i,
+                                self.jobs[job_id].production_order_nr,
+                                va="center",
+                                ha="center",
+                                fontsize=21,
+                                color="white",
+                            )
+                        ax.broken_barh(
+                            [(current_plot[0], current_plot[1] - current_plot[0])],
+                            (i - 0.25, 0.5),
+                            **kwargs,
                         )
-                        ax.broken_barh([(current_plot[0], current_plot[1] - current_plot[0])],(i-0.25, 0.5), **kwargs)
         for machine in self.machines:
             max_time = schedule[machine.machine_id][-1][2]
             x_lines_start = np.arange(machine.start_time, max_time, 24 * 60)
@@ -160,7 +219,6 @@ class JobShopProblem:
                 color="red",
             )
             plt.savefig("test.png")
-                        
 
     def visualize_schedule(
         self,
@@ -220,7 +278,10 @@ class JobShopProblem:
                         alpha=0.5,
                     )
                     color = "black"
-                    if end_time - (self.jobs[job_id].days_till_delivery + 1) * 24 * 60 > 0:
+                    if (
+                        end_time - (self.jobs[job_id].days_till_delivery + 1) * 24 * 60
+                        > 0
+                    ):
                         color = "red"
 
                     ax.text(
@@ -580,11 +641,12 @@ class JobShopProblem:
             start_time = machine_start_time + (start_time // DAY_MINUTES) * DAY_MINUTES
             start_time_remainder = start_time % DAY_MINUTES
 
-
         if start_time_remainder + task_duration > machine_end_time:
             if machine_allow_preemption:
                 task_duration += DAY_MINUTES - machine_end_time + machine_start_time
-                while (start_time_remainder + task_duration) % DAY_MINUTES > machine_end_time:
+                while (
+                    start_time_remainder + task_duration
+                ) % DAY_MINUTES > machine_end_time:
                     task_duration += DAY_MINUTES - machine_end_time + machine_start_time
 
             else:
@@ -774,7 +836,9 @@ class JobShopProblem:
                     self.jobs[task[0]].production_order_nr
                 ].append(
                     max(
-                        task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0
+                        task[2]
+                        - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES,
+                        0,
                     )
                 )
 
@@ -787,7 +851,10 @@ class JobShopProblem:
     def classical_tardiness(self, schedule: schedule_type) -> float:
         return sum(
             [
-                max(task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0)
+                max(
+                    task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES,
+                    0,
+                )
                 for machine in schedule.values()
                 for task in machine
             ]
@@ -822,7 +889,7 @@ class JobShopProblem:
         if self.LOW_TOTAL_SETUP_TIME is None:
             # Normal
             self.LOW_TOTAL_SETUP_TIME = 95.0
-            
+
             # Small
             # self.LOW_TOTAL_SETUP_TIME = 35.0
         if self.LOW_MAKESPAN is None:
@@ -848,7 +915,9 @@ class JobShopProblem:
                     self.jobs[task[0]].production_order_nr
                 ].append(
                     max(
-                        task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0
+                        task[2]
+                        - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES,
+                        0,
                     )
                 )
 
