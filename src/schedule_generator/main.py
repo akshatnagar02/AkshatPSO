@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Any, Self
 import numpy as np
+import pandas as pd
 from pydantic import BaseModel
 from src.production_orders import Data, Product, BillOfMaterial
 import networkx as nx
@@ -954,6 +955,26 @@ class JobShopProblem:
             if any(bool_lateness):
                 tardiness += (max(lateness) // DAY_MINUTES + 1) * len(lateness)
         return tardiness
+
+    def generate_output(self, schedule: schedule_type | np.ndarray) -> pd.DataFrame:
+        info = {"workstation": [], "product_id": [], "amount": []}
+        if isinstance(schedule, np.ndarray):
+            schedule = self.make_schedule_from_parallel_with_stock(schedule)
+        for machine, sch in schedule.items():
+            for task in sch:
+                if task[0] == -1:
+                    continue
+                info["workstation"].append(self.machines[machine].name)
+                production_order_nr = self.jobs[task[0]].production_order_nr
+                product_id = self.data.production_orders_df[self.data.production_orders_df["production_order_nr"] == production_order_nr]["product_id"].values[0]
+                # If we have a mixing line we need the hf product id
+                if self.machines[machine].name[0] == "M":
+                    product_id = self.data.bill_of_materials[product_id].component_id
+
+                info["product_id"].append(product_id)
+                info["amount"].append(self.jobs[task[0]].amount)
+
+        return pd.DataFrame(info)
 
 
 class ObjectiveFunction(Enum):
