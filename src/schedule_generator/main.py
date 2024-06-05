@@ -192,8 +192,8 @@ class JobShopProblem:
                         (i - 0.25, 0.5),
                         **kwargs,
                     )
+        max_time = max([schedule[machine.machine_id][-1][2] for machine in self.machines])
         for machine in self.machines:
-            max_time = schedule[machine.machine_id][-1][2]
             x_lines_start = np.arange(machine.start_time, max_time, 24 * 60)
             plt.vlines(
                 x_lines_start,
@@ -211,11 +211,40 @@ class JobShopProblem:
                 color="red",
             )
         
+        # Add legend
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
         plt.legend(by_label.values(), by_label.keys())
 
-        plt.show()
+        # Machine labels
+        plt.yticks(
+            ticks=[m.machine_id for m in self.machines],
+            labels=[str(self.machines[m].name) for m in schedule.keys()],
+        )
+        plt.ylabel("Machine")
+
+        plt.xlabel("Time (minutes)")
+
+        # Add box with information about the schedule in the bottom right corner
+        textstr = f"Total tardiness: {self.classical_tardiness(schedule)}\nBoolean tardiness: {self.boolean_tardiness(schedule)}\nTotal setup time: {self.total_setup_time(schedule)}\nMakespan: {self.makespan(schedule)}"
+        props = dict(boxstyle="round", facecolor="gray", alpha=0.3)
+        plt.text(
+            0.99,
+            0.05,
+            textstr,
+            transform=ax.transAxes,
+            fontsize=14,
+            verticalalignment="bottom",
+            horizontalalignment="right",
+            bbox=props,
+        )
+
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path)
+            plt.close()
+        else:
+            plt.show()
 
     def visualize_schedule(
         self,
