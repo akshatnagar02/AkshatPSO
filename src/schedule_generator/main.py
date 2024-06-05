@@ -72,7 +72,7 @@ class JobShopProblem:
                 graph.add_edge(node, -2)
         return graph
 
-    def new_visualize_schedule(
+    def visualize_schedule(
         self,
         schedule: dict[int, list[tuple[int, int, int]]],
         save_path: str | None = None,
@@ -246,7 +246,8 @@ class JobShopProblem:
         else:
             plt.show()
 
-    def visualize_schedule(
+    
+    def old_visualize_schedule(
         self,
         schedule: dict[int, list[tuple[int, int, int]]],
         save_path: str | None = None,
