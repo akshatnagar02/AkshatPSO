@@ -77,9 +77,9 @@ class JobShopProblem:
         schedule: dict[int, list[tuple[int, int, int]]],
         save_path: str | None = None,
     ):
-        fig, ax = plt.subplots(figsize=(26, 7))
-        cmap = plt.get_cmap("tab20")
-        flavour_mapping = {"cola": 0, "fanta": 1}
+        fig, ax = plt.subplots(figsize=(18, 7))
+        cmap = plt.get_cmap("tab10")
+        flavour_mapping = {"cola": 0, "fanta": 1, "orange juice": 2, "apple juice": 3}
         for i, (machine, sch) in enumerate(schedule.items()):
             for idx, task in enumerate(sch):
                 job_id, start_time, end_time = task
@@ -89,26 +89,14 @@ class JobShopProblem:
                 if sch[idx - 1][0] != -1:
                     setup_time = self.setup_times[sch[idx - 1][0], job_id]
                 flavour = self.jobs[job_id].station_settings["taste"]
+                to_be_plotted = list()
                 if self.machines[machine].name[0] == "M":
                     # Get hf flavour
-                    to_be_plotted = list()
-                    to_be_plotted.append((start_time + setup_time, end_time))
+                    to_be_plotted.append((start_time + setup_time, end_time, False))
                     if setup_time > 0:
-                        to_be_plotted.append((start_time, start_time + setup_time))
-                    for plot_idx, times in enumerate(to_be_plotted):
-                        kwargs = {
-                            # "hatch": "O",
-                            "facecolor": cmap(flavour_mapping[flavour]),
-                            "edgecolor": "black",
-                        }
-                        if plot_idx == 1:
-                            kwargs["hatch"] = "/"
-                        ax.broken_barh(
-                            [(times[0], times[1] - times[0])], (i - 0.25, 0.5), **kwargs
-                        )
+                        to_be_plotted.append((start_time, start_time + setup_time, True))
                 else:
                     # List with tuples of (start time, end time, is setup?)
-                    to_be_plotted = list()
                     # Check if we need to split into multiple parts because of preemption
                     if (
                         end_time - start_time - setup_time
@@ -177,29 +165,33 @@ class JobShopProblem:
                                 (start_time, start_time + setup_time, True)
                             )
                         to_be_plotted.append((start_time + setup_time, end_time, False))
-                    for current_plot in to_be_plotted:
-                        kwargs = {
-                            # "hatch": "O",
-                            "facecolor": cmap(flavour_mapping[flavour]),
-                            "edgecolor": "black",
-                        }
-                        if current_plot[2]:
-                            kwargs["hatch"] = "/"
-                        else:
-                            ax.text(
-                                (current_plot[0] + current_plot[1]) / 2,
-                                i,
-                                self.jobs[job_id].production_order_nr,
-                                va="center",
-                                ha="center",
-                                fontsize=21,
-                                color="white",
-                            )
-                        ax.broken_barh(
-                            [(current_plot[0], current_plot[1] - current_plot[0])],
-                            (i - 0.25, 0.5),
-                            **kwargs,
+                for current_plot in to_be_plotted:
+                    kwargs = {
+                        # "hatch": "O",
+                        "facecolor": cmap(flavour_mapping[flavour]),
+                        "edgecolor": "black",
+                        "label": flavour
+                    }
+                    if current_plot[2]:
+                        kwargs["hatch"] = "/"
+                        kwargs["alpha"] = 0.5
+                        kwargs["facecolor"] = "gray"
+                        kwargs["label"] = "setup"
+                    elif self.machines[machine].name[0] == "B":
+                        ax.text(
+                            (current_plot[0] + current_plot[1]) / 2,
+                            i,
+                            self.jobs[job_id].production_order_nr,
+                            va="center",
+                            ha="center",
+                            fontsize=21,
+                            color="white",
                         )
+                    ax.broken_barh(
+                        [(current_plot[0], current_plot[1] - current_plot[0])],
+                        (i - 0.25, 0.5),
+                        **kwargs,
+                    )
         for machine in self.machines:
             max_time = schedule[machine.machine_id][-1][2]
             x_lines_start = np.arange(machine.start_time, max_time, 24 * 60)
@@ -218,7 +210,12 @@ class JobShopProblem:
                 linestyles="dashed",
                 color="red",
             )
-            plt.savefig("test.png")
+        
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys())
+
+        plt.show()
 
     def visualize_schedule(
         self,
