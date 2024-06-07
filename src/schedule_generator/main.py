@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Any, Self
 import numpy as np
+import pandas as pd
 from pydantic import BaseModel
 from src.production_orders import Data, Product, BillOfMaterial
 import networkx as nx
@@ -77,6 +78,181 @@ class JobShopProblem:
         schedule: dict[int, list[tuple[int, int, int]]],
         save_path: str | None = None,
     ):
+        fig, ax = plt.subplots(figsize=(18, 7))
+        cmap = plt.get_cmap("tab10")
+        flavour_mapping = {"cola": 0, "fanta": 1, "orange juice": 2, "apple juice": 3}
+        for i, (machine, sch) in enumerate(schedule.items()):
+            for idx, task in enumerate(sch):
+                job_id, start_time, end_time = task
+                if job_id == -1:
+                    continue
+                setup_time = 0
+                if sch[idx - 1][0] != -1:
+                    setup_time = self.setup_times[sch[idx - 1][0], job_id]
+                flavour = self.jobs[job_id].station_settings["taste"]
+                to_be_plotted = list()
+                if self.machines[machine].name[0] == "M":
+                    # Get hf flavour
+                    to_be_plotted.append((start_time + setup_time, end_time, False))
+                    if setup_time > 0:
+                        to_be_plotted.append((start_time, start_time + setup_time, True))
+                else:
+                    # List with tuples of (start time, end time, is setup?)
+                    # Check if we need to split into multiple parts because of preemption
+                    if (
+                        end_time - start_time - setup_time
+                        > self.jobs[job_id].available_machines[machine]
+                    ):
+                        # How many days are we splitting it into?
+                        no_days = (
+                            end_time - start_time - setup_time
+                        ) // DAY_MINUTES + 1
+                        start_day = start_time // DAY_MINUTES
+                        if no_days == 1:
+                            if (start_time + setup_time) % DAY_MINUTES > self.machines[
+                                machine
+                            ].end_time:
+                                to_be_plotted.append(
+                                    (
+                                        start_time,
+                                        self.machines[machine].end_time
+                                        + DAY_MINUTES * start_day,
+                                        True,
+                                    )
+                                )
+                                to_be_plotted.append(
+                                    (
+                                        self.machines[machine].start_time
+                                        + DAY_MINUTES * (start_day + 1),
+                                        self.machines[machine].start_time
+                                        + DAY_MINUTES * (start_day + 1)
+                                        + (DAY_MINUTES - start_time + setup_time)
+                                        % DAY_MINUTES,
+                                        True,
+                                    )
+                                )
+                                to_be_plotted.append(
+                                    (
+                                        self.machines[machine].start_time
+                                        + DAY_MINUTES * (start_day + 1),
+                                        end_time,
+                                        False,
+                                    )
+                                )
+                            else:
+                                to_be_plotted.append(
+                                    (start_time, start_time + setup_time, True)
+                                )
+                                to_be_plotted.append(
+                                    (
+                                        start_time + setup_time,
+                                        self.machines[machine].end_time
+                                        + DAY_MINUTES * start_day,
+                                        False,
+                                    )
+                                )
+                                to_be_plotted.append(
+                                    (
+                                        self.machines[machine].start_time
+                                        + DAY_MINUTES * (start_day + 1),
+                                        end_time,
+                                        False,
+                                    )
+                                )
+
+                    else:
+                        if setup_time > 0:
+                            to_be_plotted.append(
+                                (start_time, start_time + setup_time, True)
+                            )
+                        to_be_plotted.append((start_time + setup_time, end_time, False))
+                for current_plot in to_be_plotted:
+                    kwargs = {
+                        # "hatch": "O",
+                        "facecolor": cmap(flavour_mapping[flavour]),
+                        "edgecolor": "black",
+                        "label": flavour
+                    }
+                    if current_plot[2]:
+                        kwargs["hatch"] = "/"
+                        kwargs["alpha"] = 0.5
+                        kwargs["facecolor"] = "gray"
+                        kwargs["label"] = "setup"
+                    elif self.machines[machine].name[0] == "B":
+                        ax.text(
+                            (current_plot[0] + current_plot[1]) / 2,
+                            i,
+                            self.jobs[job_id].production_order_nr,
+                            va="center",
+                            ha="center",
+                            fontsize=21,
+                            color="white",
+                        )
+                    ax.broken_barh(
+                        [(current_plot[0], current_plot[1] - current_plot[0])],
+                        (i - 0.25, 0.5),
+                        **kwargs,
+                    )
+        max_time = max([schedule[machine.machine_id][-1][2] for machine in self.machines])
+        for machine in self.machines:
+            x_lines_start = np.arange(machine.start_time, max_time, 24 * 60)
+            plt.vlines(
+                x_lines_start,
+                machine.machine_id - 0.4,
+                machine.machine_id + 0.4,
+                linestyles="dashed",
+                color="green",
+            )
+            x_lines_end = np.arange(machine.end_time, max_time, 24 * 60)
+            plt.vlines(
+                x_lines_end,
+                machine.machine_id - 0.4,
+                machine.machine_id + 0.4,
+                linestyles="dashed",
+                color="red",
+            )
+        
+        # Add legend
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys())
+
+        # Machine labels
+        plt.yticks(
+            ticks=[m.machine_id for m in self.machines],
+            labels=[str(self.machines[m].name) for m in schedule.keys()],
+        )
+        plt.ylabel("Machine")
+
+        plt.xlabel("Time (minutes)")
+
+        # Add box with information about the schedule in the bottom right corner
+        textstr = f"Total tardiness: {self.classical_tardiness(schedule)}\nBoolean tardiness: {self.boolean_tardiness(schedule)}\nTotal setup time: {self.total_setup_time(schedule)}\nMakespan: {self.makespan(schedule)}"
+        props = dict(boxstyle="round", facecolor="gray", alpha=0.3)
+        plt.text(
+            0.99,
+            0.05,
+            textstr,
+            transform=ax.transAxes,
+            fontsize=14,
+            verticalalignment="bottom",
+            horizontalalignment="right",
+            bbox=props,
+        )
+
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path)
+            plt.close()
+        else:
+            plt.show()
+
+    
+    def old_visualize_schedule(
+        self,
+        schedule: dict[int, list[tuple[int, int, int]]],
+        save_path: str | None = None,
+    ):
         """Visualizes a schedule."""
         fig, ax = plt.subplots(figsize=(13, 7))
         cmap = plt.get_cmap("tab20")
@@ -130,7 +306,10 @@ class JobShopProblem:
                         alpha=0.5,
                     )
                     color = "black"
-                    if end_time - (self.jobs[job_id].days_till_delivery + 1) * 24 * 60 > 0:
+                    if (
+                        end_time - (self.jobs[job_id].days_till_delivery + 1) * 24 * 60
+                        > 0
+                    ):
                         color = "red"
 
                     ax.text(
@@ -490,11 +669,12 @@ class JobShopProblem:
             start_time = machine_start_time + (start_time // DAY_MINUTES) * DAY_MINUTES
             start_time_remainder = start_time % DAY_MINUTES
 
-
         if start_time_remainder + task_duration > machine_end_time:
             if machine_allow_preemption:
                 task_duration += DAY_MINUTES - machine_end_time + machine_start_time
-                while (start_time_remainder + task_duration) % DAY_MINUTES > machine_end_time:
+                while (
+                    start_time_remainder + task_duration
+                ) % DAY_MINUTES > machine_end_time:
                     task_duration += DAY_MINUTES - machine_end_time + machine_start_time
 
             else:
@@ -684,7 +864,9 @@ class JobShopProblem:
                     self.jobs[task[0]].production_order_nr
                 ].append(
                     max(
-                        task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0
+                        task[2]
+                        - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES,
+                        0,
                     )
                 )
 
@@ -697,7 +879,10 @@ class JobShopProblem:
     def classical_tardiness(self, schedule: schedule_type) -> float:
         return sum(
             [
-                max(task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0)
+                max(
+                    task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES,
+                    0,
+                )
                 for machine in schedule.values()
                 for task in machine
             ]
@@ -732,7 +917,7 @@ class JobShopProblem:
         if self.LOW_TOTAL_SETUP_TIME is None:
             # Normal
             self.LOW_TOTAL_SETUP_TIME = 95.0
-            
+
             # Small
             # self.LOW_TOTAL_SETUP_TIME = 35.0
         if self.LOW_MAKESPAN is None:
@@ -758,7 +943,9 @@ class JobShopProblem:
                     self.jobs[task[0]].production_order_nr
                 ].append(
                     max(
-                        task[2] - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES, 0
+                        task[2]
+                        - (self.jobs[task[0]].days_till_delivery + 1) * DAY_MINUTES,
+                        0,
                     )
                 )
 
@@ -768,6 +955,26 @@ class JobShopProblem:
             if any(bool_lateness):
                 tardiness += (max(lateness) // DAY_MINUTES + 1) * len(lateness)
         return tardiness
+
+    def generate_output(self, schedule: schedule_type | np.ndarray) -> pd.DataFrame:
+        info = {"workstation": [], "product_id": [], "amount": []}
+        if isinstance(schedule, np.ndarray):
+            schedule = self.make_schedule_from_parallel_with_stock(schedule)
+        for machine, sch in schedule.items():
+            for task in sch:
+                if task[0] == -1:
+                    continue
+                info["workstation"].append(self.machines[machine].name)
+                production_order_nr = self.jobs[task[0]].production_order_nr
+                product_id = self.data.production_orders_df[self.data.production_orders_df["production_order_nr"] == production_order_nr]["product_id"].values[0]
+                # If we have a mixing line we need the hf product id
+                if self.machines[machine].name[0] == "M":
+                    product_id = self.data.bill_of_materials[product_id].component_id
+
+                info["product_id"].append(product_id)
+                info["amount"].append(self.jobs[task[0]].amount)
+
+        return pd.DataFrame(info)
 
 
 class ObjectiveFunction(Enum):
