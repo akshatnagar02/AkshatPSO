@@ -23,9 +23,11 @@ class TwoStageACO:
         q_zero: float = 0.9,
         tau_zero: float = 1.0,
         verbose: bool = False,
+        quite: bool = False,
         with_stock_schedule: bool = False,
         with_local_search: bool = True,
         local_search_iterations: int = 20,
+        time_limit: int | None = None,
     ) -> None:
         """Initializes the two-stage ACO algorithm.
 
@@ -81,6 +83,8 @@ class TwoStageACO:
         self.with_stock_schedule = with_stock_schedule
         self.with_local_search = with_local_search
         self.local_search_iterations = local_search_iterations
+        self.time_limit = time_limit
+        self.quite = quite
 
     def evaluate(self, parallel_schedule: np.ndarray) -> float:
         """Evaluates the path and machine assignment."""
@@ -160,6 +164,7 @@ class TwoStageACO:
 
     def local_update_pheromones(self, schedule: np.ndarray, objective_value: float):
         # inverse_objective_value = (1.0 / objective_value) / self.tau_zero
+        # inverse_objective_value = self.tau_zero
         for machine in range(len(self.problem.machines)):
             for idx, job_idx in enumerate(schedule[machine]):
                 if job_idx == -2:
@@ -185,8 +190,6 @@ class TwoStageACO:
         self, jobs_to_schedule: set[int], last: int, machine: int
     ) -> int:
         jobs_to_schedule_list = list(jobs_to_schedule)
-        # if last == -1:
-        #     return select_random_item(jobs_to_schedule_list)
 
         probabilites = np.zeros(len(jobs_to_schedule_list))
         denominator = 0.0
@@ -200,7 +203,6 @@ class TwoStageACO:
             eta_r_s = 1.0 / (
                 (
                     1
-                    # self.problem.jobs[job].available_machines[machine]
                     + self.problem.setup_times[last, job]
                 )
                 * coef
@@ -289,6 +291,7 @@ class TwoStageACO:
 
     def run(self):
         min_same = 0
+        start_time = time.time()
         for gen in range(self.n_iter):
             results = list()
             for _ in range(self.n_ants):
@@ -301,7 +304,7 @@ class TwoStageACO:
                 print(
                     f"Generation {gen}, best objective value: {self.best_solution[0]}"
                 )
-            elif gen % 10 == 0:
+            elif gen % 10 == 0 and not self.quite:
                 print(
                     f"Generation {gen}, best objective value: {self.best_solution[0]} "
                     f"max={np.max(results):.3f},min={minimum:.3f},mean={np.mean(results):.3f},std={np.std(results):.3f}"
@@ -309,12 +312,17 @@ class TwoStageACO:
             self.global_update_pheromones()
             self.pheromones_stage_one *= 0.99
             self.pheromones_stage_two *= 0.99
+            if self.time_limit:
+                if time.time() - start_time > self.time_limit:
+                    print("Time limit reached, stopping...")
+                    break
             if abs(np.min(results) - self.best_solution[0]) < 1e-6:
                 min_same += 1
             else:
                 min_same = 0
             if min_same == 10:
-                print("Resetting pheromones")
+                if self.verbose:
+                    print("Resetting pheromones")
                 self.pheromones_stage_one = self.pheromones_stage_one * 0 + 1
                 self.pheromones_stage_two = self.pheromones_stage_two * 0 + 1
                 min_same = 0
@@ -340,16 +348,16 @@ class TwoStageACO:
 
 if __name__ == "__main__":
     data = parse_data(
-        r"B:\Documents\Skola\UvA\Y3P6\git_folder\src\examples\data_v1_single.xlsx"
+        r"B:\Documents\Skola\UvA\Y3P6\git_folder\src\examples\data_v1_large.xlsx"
     )
     jssp = JobShopProblem.from_data(data)
     aco = TwoStageACO(
         jssp,
-        ObjectiveFunction.CLASSICAL_TARDINESS,
+        ObjectiveFunction.MAKESPAN,
         verbose=False,
-        n_iter=5000,
-        n_ants=10,
-        tau_zero=1.0 / (590.0),
+        n_iter=1_000,
+        n_ants=20,
+        tau_zero=1.0 / (17000.0),
         q_zero=0.9,
         with_stock_schedule=True,
         seed=20534043,
@@ -357,18 +365,19 @@ if __name__ == "__main__":
         local_search_iterations=30,
         alpha=0.1,
         rho=0.01,
+        time_limit=60*5
     )
     # aco = TwoStageACO.load("custom_version_1_0", jssp, n_iter=10000, n_ants = 10, seed=2358002486, with_stock_schedule=True, rho=0.01, with_local_search=False, q_zero=0.95)
-    start_time = time.time()
+    # start_time = time.time()
     aco.run()
-    print(f"Time taken: {time.time() - start_time}")
+    # print(f"Time taken: {time.time() - start_time}")
     print(aco.best_solution)
     sc = aco.problem.make_schedule_from_parallel_with_stock(aco.best_solution[1])
-    print(f"custom: {jssp.custom_objective(sc):.3f}, makespan: {jssp.makespan(sc):.3f}, boolean tardiness: {jssp.boolean_tardiness(sc):.3f}, total setup time: {jssp.total_setup_time(sc):.3f}")
-    print(f"{jssp.classical_tardiness(sc)}")
-    aco.problem.visualize_schedule(sc)
+    # print(f"custom: {jssp.custom_objective(sc):.3f}, makespan: {jssp.makespan(sc):.3f}, boolean tardiness: {jssp.boolean_tardiness(sc):.3f}, total setup time: {jssp.total_setup_time(sc):.3f}")
+    # print(f"{jssp.classical_tardiness(sc)}")
+    # aco.problem.visualize_schedule(sc)
 
-    aco.save("custom_version_1_0")
+    # aco.save("custom_version_1_0")
     # plt.imshow(aco.pheromones_stage_one)
     # plt.colorbar()
     # plt.show()
