@@ -95,7 +95,9 @@ class JobShopProblem:
                     # Get hf flavour
                     to_be_plotted.append((start_time + setup_time, end_time, False))
                     if setup_time > 0:
-                        to_be_plotted.append((start_time, start_time + setup_time, True))
+                        to_be_plotted.append(
+                            (start_time, start_time + setup_time, True)
+                        )
                 else:
                     # List with tuples of (start time, end time, is setup?)
                     # Check if we need to split into multiple parts because of preemption
@@ -171,7 +173,7 @@ class JobShopProblem:
                         # "hatch": "O",
                         "facecolor": cmap(flavour_mapping[flavour]),
                         "edgecolor": "black",
-                        "label": flavour
+                        "label": flavour,
                     }
                     if current_plot[2]:
                         kwargs["hatch"] = "/"
@@ -193,7 +195,9 @@ class JobShopProblem:
                         (i - 0.25, 0.5),
                         **kwargs,
                     )
-        max_time = max([schedule[machine.machine_id][-1][2] for machine in self.machines])
+        max_time = max(
+            [schedule[machine.machine_id][-1][2] for machine in self.machines]
+        )
         for machine in self.machines:
             x_lines_start = np.arange(machine.start_time, max_time, 24 * 60)
             plt.vlines(
@@ -211,7 +215,7 @@ class JobShopProblem:
                 linestyles="dashed",
                 color="red",
             )
-        
+
         # Add legend
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
@@ -247,7 +251,6 @@ class JobShopProblem:
         else:
             plt.show()
 
-    
     def old_visualize_schedule(
         self,
         schedule: dict[int, list[tuple[int, int, int]]],
@@ -966,7 +969,10 @@ class JobShopProblem:
                     continue
                 info["workstation"].append(self.machines[machine].name)
                 production_order_nr = self.jobs[task[0]].production_order_nr
-                product_id = self.data.production_orders_df[self.data.production_orders_df["production_order_nr"] == production_order_nr]["product_id"].values[0]
+                product_id = self.data.production_orders_df[
+                    self.data.production_orders_df["production_order_nr"]
+                    == production_order_nr
+                ]["product_id"].values[0]
                 # If we have a mixing line we need the hf product id
                 if self.machines[machine].name[0] == "M":
                     product_id = self.data.bill_of_materials[product_id].component_id
