@@ -1,4 +1,8 @@
-# Code
-This folder contains the code for the thesis.
+# Code Source
+This folder contains the code for the thesis; the test, benchmark, model, and heuristic code.
 
-Under the folder `schedule_generator` you can find the code for Ant Colony Optimization with a exact local search. To be able to run it (with exact search) you need a MIP solver, such as CPLEX (recomended), coinor-cbc, or glpk. At the moment you have to change to the correct solver manually in the file `schedule_generator/poc_aoc_local_search.py`.
+## Structure
+* `src/examples/` contains three data sets for the thesis. These are small (5 orders), medium (7 orders), and large (100 orders) in size.
+* `src/schedule_generator/` contains code for loading a `JobShopScheduling` instance and the code for the Ant Colony Optimisation.
+* `src/production_orders.py` contains the code for loading the data sets into `pydantic` and pandas DataFrame objects.
+* `src/tests/` contains tests for the `production_orders.py` code.
