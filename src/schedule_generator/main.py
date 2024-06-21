@@ -343,7 +343,7 @@ class JobShopProblem:
         day_markers = np.arange(0, max_time, 24 * 60)
         day_labels = [f"{d//24//60}" for d in day_markers]
 
-        # plt.xticks(ticks=np.concatenate([day_markers]), labels=day_labels)
+        plt.xticks(ticks=np.concatenate([day_markers]), labels=day_labels)
         plt.yticks(
             ticks=np.arange(1, len(schedule) + 1),
             labels=[str(self.machines[m].name) for m in schedule.keys()],
@@ -926,7 +926,7 @@ class JobShopProblem:
 
         tardiness = 0
         for lateness in production_order_lateness.values():
-            if any([l > 0 for l in lateness]):
+            if any([l > 0 for l in lateness]):  # noqa: E741
                 tardiness += np.max(lateness) * len(lateness)
         return int(tardiness)
 
@@ -1036,7 +1036,7 @@ class JobShopProblem:
 
         tardiness = 0
         for lateness in production_order_lateness.values():
-            bool_lateness = [l > 0 for l in lateness]
+            bool_lateness = [l > 0 for l in lateness]  # noqa: E741
             if any(bool_lateness):
                 tardiness += (max(lateness) // DAY_MINUTES + 1) * len(lateness)
         return tardiness
