@@ -192,6 +192,13 @@ class JobShopProblem:
                         kwargs["facecolor"] = "gray"
                         kwargs["label"] = "setup"
                     elif self.machines[machine].name[0] == "B":
+                        color = "white"
+                        if (
+                            end_time
+                            - (self.jobs[job_id].days_till_delivery + 1) * 24 * 60
+                            > 0
+                        ):
+                            color = "red"
                         ax.text(
                             (current_plot[0] + current_plot[1]) / 2,
                             i,
@@ -199,7 +206,7 @@ class JobShopProblem:
                             va="center",
                             ha="center",
                             fontsize=21,
-                            color="white",
+                            color=color,
                         )
                     ax.broken_barh(
                         [(current_plot[0], current_plot[1] - current_plot[0])],
