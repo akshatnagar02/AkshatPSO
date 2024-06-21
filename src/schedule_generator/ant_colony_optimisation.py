@@ -28,6 +28,7 @@ class TwoStageACO:
         with_stock_schedule: bool = False,
         with_local_search: bool = True,
         local_search_iterations: int = 20,
+        convergence_limit: int = 20,
     ) -> None:
         """Initializes the two-stage ACO algorithm.
 
@@ -56,6 +57,7 @@ class TwoStageACO:
             with_stock_schedule (bool, optional): defines if the stock schedule should be used. Defaults to False.
             with_local_search (bool, optional): defines if local search should be used. Defaults to True.
             local_search_iterations (int, optional): number of iterations for the local search. Defaults to 20.
+            convergence_limit (int, optional): number of iterations with the same best solution before the pheromones are reset. Defaults to 20.
         """
         self.problem = problem
         self.n_ants = n_ants
@@ -86,6 +88,7 @@ class TwoStageACO:
         self.with_stock_schedule = with_stock_schedule
         self.with_local_search = with_local_search
         self.local_search_iterations = local_search_iterations
+        self.conv_limit = convergence_limit
         self.time_limit = time_limit
         self.quite = quite
         self.best_solution: tuple[float, np.ndarray] = (1e100, np.zeros((1, 1)))
@@ -362,8 +365,8 @@ class TwoStageACO:
                 min_same += 1
             else:
                 min_same = 0
-            if min_same == 50:
-                if self.verbose or True:
+            if min_same == self.conv_limit:
+                if self.verbose:
                     print("Resetting pheromones")
                 self.pheromones_stage_one = self.pheromones_stage_one * 0 + 1
                 self.pheromones_stage_two = self.pheromones_stage_two * 0 + 1
@@ -407,17 +410,17 @@ if __name__ == "__main__":
         jssp,
         ObjectiveFunction.MAKESPAN,
         verbose=False,
-        n_iter=1_00,
+        n_iter=10_000,
         n_ants=10,
-        tau_zero=1.0 / (17000.0),
+        tau_zero=1.0 / (16000.0),
         q_zero=0.9,
         with_stock_schedule=True,
-        seed=8345096,
+        seed=834,
         with_local_search=False,
         local_search_iterations=30,
         alpha=0.1,
         rho=0.01,
-        time_limit=60 * 5,
+        time_limit=60 * 10,
     )
     # aco = TwoStageACO.load("custom_version_1_0", jssp, n_iter=10000, n_ants = 10, seed=2358002486, with_stock_schedule=True, rho=0.01, with_local_search=False, q_zero=0.95)
     start_time = time.time()
