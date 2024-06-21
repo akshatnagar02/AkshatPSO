@@ -12,6 +12,7 @@ DAY_MINUTES = 24 * 60
 
 class Job(BaseModel):
     """Contains the information about a job that needs to be done."""
+
     available_machines: dict[int, float]
     dependencies: list[int]
     production_order_nr: str
@@ -23,6 +24,7 @@ class Job(BaseModel):
 
 class Machine(BaseModel):
     """Contains information about a machine that can be used to process jobs."""
+
     name: str
     machine_id: int
     start_time: int = 0
@@ -84,7 +86,7 @@ class JobShopProblem:
 
         Args:
             schedule (dict[int, list[tuple[int, int, int]]]): the schedule that should be visualized
-            save_path (str | None, optional): path to save the visualisation, if none is give it will display it. 
+            save_path (str | None, optional): path to save the visualisation, if none is give it will display it.
                 Defaults to None.
         """
         fig, ax = plt.subplots(figsize=(18, 7))
@@ -983,7 +985,7 @@ class JobShopProblem:
 
             # Small
             # self.LOW_TARDINESS = 0.1
-        
+
             # Unkown means we will take 60% of the total tardiness
             self.LOW_TARDINESS = 0.6 * tardiness
         if self.LOW_TOTAL_SETUP_TIME is None:
@@ -1008,7 +1010,7 @@ class JobShopProblem:
         )
 
     def boolean_tardiness(self, schedule: schedule_type) -> int:
-        """Calculates the total number of days that a production order is late (includes all 
+        """Calculates the total number of days that a production order is late (includes all
         orders even if some are done on time).
 
         Args:

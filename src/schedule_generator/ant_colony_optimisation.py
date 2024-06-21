@@ -1,7 +1,6 @@
 import time
 from typing import Self
 
-from matplotlib import pyplot as plt
 from src.production_orders import parse_data
 from src.schedule_generator.main import JobShopProblem, ObjectiveFunction
 from src.schedule_generator.numba_numpy_functions import select_random_item, nb_set_seed
