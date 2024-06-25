@@ -1,5 +1,6 @@
 # Business Analytics Bachelor's Thesis
 ## Job Shop Scheduling
+To find more information about the code please take a look at the [`src/README.md`](https://github.com/AlbinLind/bachelors-thesis/blob/master/src/README.md). 
 
 ## Development
 ### Git Fork Workflow
