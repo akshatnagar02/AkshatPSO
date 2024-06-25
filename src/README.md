@@ -42,7 +42,7 @@ from src.production_orders import parse_data
 from src.exact_solution import generate_model, solve_model, get_schedule
 
 # Load the problem
-jssp = JobShopProblem(parse_data("path/to/data"))
+jssp = JobShopProblem.from_problem(parse_data("path/to/data"))
 
 # Generate a pyomo concrete model
 model = generate_model(jssp)
