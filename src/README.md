@@ -33,6 +33,28 @@ Depending on how verbose you may want the heuristic to be you can specify two di
 > [!NOTE]
 > The `JobShopProblem.from_data()` method is unique for this problem that has been developed. If you wish to extend this model to a new problem that does not have the same constraints I would recommend to create a new class. You should inherit from the JobShopProblem, but change the functions so that it fits your problem. Once that is done it will seamlessly fit into the `TwoStageACO` class, and can be solved. Please make sure that the return types are similar.
 
+## Exact Method
+The exact method resides in `src/schedule_generator/exact_solution.py`. This model struggles with bigger magnitudes of production orders, and are only really able to solve problems up to around 7 produciton orders. In order to solve it its highly recomended to have access to a strong solver such as CPLEX (which is also the only officially tested solver), since the mathematical model is rather complex. Below is an example on how it could be solved with CPLEX installed on your system.
+
+```python
+from src.schedule_generator.main import JobShopProblem
+from src.production_orders import parse_data
+from src.exact_solution import generate_model, solve_model, get_schedule
+
+# Load the problem
+jssp = JobShopProblem(parse_data("path/to/data"))
+
+# Generate a pyomo concrete model
+model = generate_model(jssp)
+
+# Solve the model with CPLEX, you can also provide a time limit
+solve_model(model)
+
+# (Optional) visualize the schedule
+sc = get_schedule(model, jssp)
+jssp.visualize_schedule(sc)
+```
+
 ## Structure
 * `src/examples/` contains three data sets for the thesis. These are small (5 orders), medium (7 orders), and large (100 orders) in size.
 * `src/schedule_generator/` contains code for loading a `JobShopProblem` instance and the code for the Ant Colony Optimisation.
