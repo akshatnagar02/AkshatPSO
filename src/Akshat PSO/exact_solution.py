@@ -303,7 +303,7 @@ def check_model_feasible(model: pyo.ConcreteModel) -> bool:
 
 
 if __name__ == "__main__":
-    jssp = JobShopProblem.from_data(parse_data("examples/data_v1.xlsx"))
+    jssp = JobShopProblem.from_data(parse_data("/Users/akshatnagar/Desktop/AkshatPSO/src/examples/data v1.xlsx"))
     print("Data parsed...")
     print("Generating model...")
     model = generate_model(jssp)

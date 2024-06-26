@@ -27,30 +27,35 @@ class PSO:
 
     def topological_sort(self):
         ''' 
-        Performs a topological sort on the job dependencies to determine a valid sequence of jobs.
+        STEP 2 OF PSO WORKFLOW: Performs a topological sort on the job dependencies to determine a valid sequence of jobs.
         
         Returns:
             sorted_jobs (list): A list of job indices in a topologically sorted order.
         '''
+
+        #Initialize the in-degree count to be 0 for each job 
         in_degree = {i: 0 for i in range(len(self.jssp.jobs))}
         graph = defaultdict(list)
 
+        #Builds graph and computes in-degrees for each job
         for job_idx, job in enumerate(self.jssp.jobs):
             for dep in job.dependencies:
                 graph[dep].append(job_idx)
                 in_degree[job_idx] += 1
 
+        # Initialize and process a queue of jobs that have no dependencies and store in topological order
         queue = deque([job_idx for job_idx in in_degree if in_degree[job_idx] == 0])
         sorted_jobs = []
 
         while queue:
-            job_idx = queue.popleft()
-            sorted_jobs.append(job_idx)
+            job_idx = queue.popleft() 
+            sorted_jobs.append(job_idx) 
             for neighbor in graph[job_idx]:
                 in_degree[neighbor] -= 1
                 if in_degree[neighbor] == 0:
                     queue.append(neighbor)
 
+        #Check for circular dependency
         if len(sorted_jobs) != len(self.jssp.jobs):
             raise ScheduleError("Circular dependency detected")
 
@@ -58,7 +63,7 @@ class PSO:
 
     def grouped_prod(self):
         ''' 
-        Groups jobs together by production order number.
+        STEP 2 OF PSO WORKFLOW: Groups jobs together by production order number.
         
         Returns:
             grouped_jobs (defaultdict): A dictionary where each key is a production order number
@@ -72,22 +77,26 @@ class PSO:
 
     def init_particles(self):
         '''
-        Initializes entire swarm of particles including their positions and velocities for the first iteration. Jobs are considered to be grouped by production order.
+        STEP 3 OF PSO WORKFLOW: Initializes entire swarm of particles including their positions and velocities for the first iteration. Jobs are considered to be grouped by production order.
         Also stores initial global and personal best positions.
         '''
+
         grouped_jobs = self.grouped_prod()
+
         for _ in range(self.num_particles):
             position = self.init_position(grouped_jobs)
             velocity = np.zeros(len(position))
             self.particles.append(position)
             self.velocities.append(velocity)
             self.p_best.append(position)
+
+            #Update global best if necessary
             if self.g_best is None or self.evaluate(position) < self.evaluate(self.g_best):
                 self.g_best = position
 
     def init_position(self, grouped_jobs):
         '''
-        Initializes feasible initial job sequences and machine assignments for each particle. Takes grouped_jobs as input and performs topological sort to respect job dependencies. Grouped jobs are then randomly assigned selected available machines using random.choice which is uniform random distribution function. 
+        STEP 3 OF PSO WORKFLOW: Initializes feasible initial job sequences and machine assignments for each particle. Takes grouped_jobs as input and performs topological sort to respect job dependencies. Grouped jobs are then randomly assigned selected available machines using random.choice which is uniform random distribution function. 
 
         Arg:
             grouped_jobs (defaultdict): A dictionary where each key is a production order number and each value is a 
@@ -98,6 +107,8 @@ class PSO:
         '''
         sorted_jobs = self.topological_sort()
         position = []
+
+        #Iterates through each production order and its jobs, finds and selects avaialble machine for jobs
         for order_nr, jobs in grouped_jobs.items():
             for job in jobs:
                 available_machines = list(self.jssp.jobs[job].available_machines.keys())
@@ -107,7 +118,7 @@ class PSO:
 
     def evaluate(self, position):
         '''
-        Evaluates fitness of each particle. Generates a schedule based on job order and machine assignments used to calculate objective functions score.
+        STEP 4 OF PSO WORKFLOW: Evaluates fitness of each particle. Generates a schedule based on job order and machine assignments used to calculate objective functions score.
         
         Args: 
             position (list): A list of tuples where each tuple contains the initial job and machine index.
@@ -120,6 +131,7 @@ class PSO:
             job_orders[int(machine)].append(job)
         schedule = self.jssp.make_schedule_from_parallel_with_stock(job_orders)
 
+        #Calcualte fitness based on selected objective function
         if self.objective_function == ObjectiveFunction.CUSTOM_OBJECTIVE:
             return self.jssp.custom_objective(schedule)
         elif self.objective_function == ObjectiveFunction.MAKESPAN:
@@ -131,33 +143,37 @@ class PSO:
 
     def update_velocity(self, i, iter):
         ''' 
-        First updates inertia weight, then updates velocity for each particle. r1 and r2 remain as uniformly distributed random arrays.
+        STEP 6 OF PSO WORKFLOW: First updates inertia weight, then updates velocity for each particle. r1 and r2 remain as uniformly distributed random arrays.
 
         Args:
             i (int): Index of the particle whose velocity is being updated.
             iter (int): Current iteration number, used to calculate the inertia weight.
         '''
+        #Calculates inertia wieght for iteration
         inertia_weight_update = self.inertia_max - ((self.inertia_max - self.inertia_min) / self.max_iter) * iter
         for j in range(len(self.velocities[i])):
             r1, r2 = random.random(), random.random()
+
+            #Update Velocity
             cognitive = self.phi1 * r1 * (self.p_best[i][j][1] - self.particles[i][j][1])
             social = self.phi2 * r2 * (self.g_best[j][1] - self.particles[i][j][1])
             self.velocities[i][j] = inertia_weight_update * self.velocities[i][j] + cognitive + social
 
     def update_position(self, i):
         ''' 
-        Updates position of each particle using respective formula. Calls validate_position to see if new position respects job dependencies and machine availability.
+        STEP 7 OF PSO WORKFLOW: Updates position of each particle using respective formula. Calls validate_position to see if new position respects job dependencies and machine availability.
 
         Args:
             i (int): Index of the particle whose position is being updated.
         '''
         for j in range(len(self.particles[i])):
             self.particles[i][j] = (self.particles[i][j][0], self.particles[i][j][1] + self.velocities[i][j])
+            #Ensures new position is valid to job dependencies
             self.particles[i][j] = self.validate_position(self.particles[i][j])
 
     def validate_position(self, position):
         """
-        Ensures valid job sequence. Checks if the machine assignment for a job is feasible by comparing it against the list of available machines for that job. If the machine assignment is not feasible it selects a valid machine from the available machines list. Job and Machine assignments are first unpacked, then the list of machines which jobs can be assigned to is retrieved. Machine assignment is then rounded as they need to be whole numbers to generate a schedule. If the machine assignment is not feasible, the function randomly selects a machine from the list of available machines. 
+        STEP 7 OF PSO WORKFLOW: Ensures valid job sequence. Checks if the machine assignment for a job is feasible by comparing it against the list of available machines for that job. If the machine assignment is not feasible it selects a valid machine from the available machines list. Job and Machine assignments are first unpacked, then the list of machines which jobs can be assigned to is retrieved. Machine assignment is then rounded as they need to be whole numbers to generate a schedule. If the machine assignment is not feasible, the function randomly selects a machine from the list of available machines. 
 
         Args:
             position (tuple): A tuple containing a job index and a machine assignment.
@@ -167,14 +183,14 @@ class PSO:
         """
         job, machine_assignment = position
         available_machines = list(self.jssp.jobs[job].available_machines.keys())
-        machine_assignment = int(round(machine_assignment))
+        machine_assignment = int(round(machine_assignment)) #Round to nearest integer for valid machine assignment
         if machine_assignment not in available_machines:
-            machine_assignment = random.choice(available_machines)
+            machine_assignment = random.choice(available_machines) #Selects a valid machine if machine is unavailable 
         return (job, machine_assignment)
     
     def iterate(self, time_limit=300):
         '''
-        Main loop of PSO algorithm. Updates the velocity and position of each particle, evaluates their fitness, and updates their personal and global best positions. 
+        STEP 8 & 9 OF PSO WORKFLOW: Main loop of PSO algorithm. Updates the velocity and position of each particle, evaluates their fitness, and updates their personal and global best positions. 
         Time limit and convergence check functions are defined here, making the algorithm stop the iteration process if completion time exceeds 5 minutes, and checks if the best score has not improved significantly over a number of iterations it will reinitialize the particles.
         
         Args:
@@ -207,12 +223,13 @@ class PSO:
                 self.best_score = best_solution_score
                 self.best_solution = self.g_best
 
+            #Convergence Check
             if abs(best_solution_score - self.best_score) < 1e-6:
                 self.max_reset += 1
             else:
                 self.max_reset = 0
 
-            if self.max_reset == 50:
+            if self.max_reset == 10: #Counter, if the gbest score does not improve over 10 iterations, particles will reinitialize 
                 self.init_particles()
                 self.max_reset = 0
 
@@ -221,7 +238,7 @@ class PSO:
 
     def local_search(self, position):
         """
-        Performs a local search to find a better job order by swapping jobs assigned to the same machine. 
+        STEP 10 OF PSO WORKFLOW: Performs a local search to find a better job order by swapping jobs assigned to the same machine. 
 
         Args:
             position (list): Current best position to improve upon.
@@ -233,7 +250,7 @@ class PSO:
         best_score = self.evaluate(position)
         max_local = 0
 
-        for _ in range(20):
+        for _ in range(20): #Number of iterations for local search 
             machine = np.random.randint(len(self.jssp.machines))
             num_jobs = len([pos for pos in position if pos[1] == machine])
             if num_jobs < 2:
@@ -250,13 +267,13 @@ class PSO:
                 max_local = 0
             else:
                 max_local += 1 
-            if max_local >= 5:
+            if max_local >= 5: #If local search does not improve score over 5 iterations then stop local search
                 break
         return best_position
 
     def downtime_check(self, schedule):
         """
-        Downtime check ensures that the end time of the previous job on the same machine is the start time of the next job. Applies this adjust to the schedule where unnecessary downtimes occur.
+        STEP 10 OF PSO WORKFLOW: Downtime check ensures that the end time of the previous job on the same machine is the start time of the next job. Applies this adjust to the schedule where unnecessary downtimes occur.
        
         Args:
             schedule (dict): The current schedule with potential gaps, where the keys are machine IDs
@@ -280,7 +297,7 @@ class PSO:
     
     def get_best_schedule(self):
         """
-        Creates the optimal schedule from the best solution found by the PSO algorithm. For each machine, the global best solution is used to determine the sequence of jobs, and the function ensures there are no downtimes between tasks on each machine.
+        STEP 12 OF PSO WORKFLOW: Creates the optimal schedule from the best solution found by the PSO algorithm. For each machine, the global best solution is used to determine the sequence of jobs, and the function ensures there are no downtimes between tasks on each machine.
 
         Returns:
             dict: The adjusted schedule with no downtime between tasks for each machine.
